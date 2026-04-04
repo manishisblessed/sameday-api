@@ -22,7 +22,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
 export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   const joined = "/" + path.join("/");
-  const body = await req.json();
+
+  let body: unknown;
+  try {
+    const text = await req.text();
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
   const result = await apiFetch(joined, { method: "POST", body });
   return NextResponse.json(result.data, { status: result.status });
 }
