@@ -123,3 +123,140 @@ export interface TransactionFilters {
   page: number;
   page_size: number;
 }
+
+/** Payout Partner API (IMPS/NEFT) — POSTMAN-COLLECTION-PAYOUT.json v2.1+ (`merchant_id`; legacy `retailer_id` alias on upstream). */
+
+/** Merchant linked to the partner account for payout (from List My Merchants). */
+export interface PayoutMerchant {
+  merchant_id: string;
+  name?: string;
+  business_name?: string;
+  email?: string;
+  phone?: string;
+  status?: string;
+  onboarded?: boolean;
+}
+
+export interface PayoutMerchantsResponse {
+  success: boolean;
+  merchants?: PayoutMerchant[];
+  total?: number;
+  message?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface PayoutBank {
+  id: number;
+  /** Display name; upstream may send `bank_name` / `bankName` — normalized in `fetchPayoutBanks`. */
+  name: string;
+  imps: boolean;
+  neft: boolean;
+}
+
+export interface PayoutBanksResponse {
+  success: boolean;
+  banks?: PayoutBank[];
+  total?: number;
+  imps_enabled?: number;
+  neft_enabled?: number;
+  error?: { code?: string; message?: string };
+}
+
+export interface PayoutVerifyRequest {
+  accountNumber: string;
+  ifscCode: string;
+  bankName?: string;
+  bankId?: number;
+}
+
+export interface PayoutVerifyResponse {
+  success: boolean;
+  is_valid?: boolean;
+  account_holder_name?: string;
+  bank_name?: string;
+  branch_name?: string;
+  verification_charges?: number;
+  message?: string;
+  reference_id?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface PayoutTransferRequest {
+  accountNumber: string;
+  ifscCode: string;
+  accountHolderName: string;
+  amount: number;
+  transferMode: "IMPS" | "NEFT";
+  bankId: number;
+  bankName: string;
+  beneficiaryMobile: string;
+  senderName: string;
+  senderMobile: string;
+  senderEmail?: string;
+  remarks?: string;
+}
+
+export interface PayoutTransferResponse {
+  success: boolean;
+  message?: string;
+  transaction_id?: string;
+  provider_txn_id?: string;
+  client_ref_id?: string;
+  status?: string;
+  amount?: number;
+  charges?: number;
+  total_debited?: number;
+  account_number?: string;
+  account_holder_name?: string;
+  bank_name?: string;
+  transfer_mode?: string;
+  error?: { code?: string; message?: string };
+  wallet_balance?: number;
+  wait_seconds?: number;
+  duplicate_prevention?: boolean;
+}
+
+export interface PayoutTransactionDetail {
+  id: string;
+  client_ref_id?: string;
+  provider_txn_id?: string;
+  rrn?: string;
+  status?: string;
+  amount?: number;
+  charges?: number;
+  total_amount?: number;
+  account_number?: string;
+  account_holder_name?: string;
+  bank_name?: string;
+  transfer_mode?: string;
+  created_at?: string;
+  completed_at?: string | null;
+  merchant_id?: string;
+  /** Legacy alias; same value as merchant_id when present */
+  retailer_id?: string;
+}
+
+export interface PayoutStatusResponse {
+  success: boolean;
+  transaction?: PayoutTransactionDetail;
+  error?: { code?: string; message?: string };
+}
+
+export interface PayoutListItem {
+  id: string;
+  merchant_id?: string;
+  /** Legacy alias from API */
+  retailer_id?: string;
+  client_ref_id?: string;
+  amount?: number;
+  charges?: number;
+  status?: string;
+  transfer_mode?: string;
+  created_at?: string;
+}
+
+export interface PayoutListResponse {
+  success: boolean;
+  transactions?: PayoutListItem[];
+  error?: { code?: string; message?: string };
+}

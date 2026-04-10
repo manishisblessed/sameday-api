@@ -4,6 +4,15 @@ import type {
   MachineResponse,
   HealthResponse,
   ExportJobResponse,
+  PayoutMerchantsResponse,
+  PayoutBanksResponse,
+  PayoutBank,
+  PayoutVerifyResponse,
+  PayoutTransferResponse,
+  PayoutStatusResponse,
+  PayoutListResponse,
+  PayoutVerifyRequest,
+  PayoutTransferRequest,
 } from "./types";
 
 const PROXY = "/api/proxy";
@@ -45,4 +54,152 @@ export async function createExportJob(body: { format: string; date_from: string;
 
 export async function checkExportStatus(jobId: string): Promise<ExportJobResponse> {
   return request(`/api/partner/export-status/${jobId}`);
+}
+
+const PAYOUT = "/api/payout";
+
+function payoutErrorMessage(data: unknown, status: number): string {
+  if (data && typeof data === "object") {
+    const o = data as { error?: { message?: string } | string; message?: string };
+    if (typeof o.error === "object" && o.error?.message) return o.error.message;
+    if (typeof o.error === "string") return o.error;
+    if (typeof o.message === "string") return o.message;
+  }
+  return `Request failed (${status})`;
+}
+
+function coerceBool(v: unknown, defaultTrue: boolean): boolean {
+  if (v === undefined || v === null) return defaultTrue;
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true" || s === "1" || s === "yes") return true;
+    if (s === "false" || s === "0" || s === "no") return false;
+  }
+  return defaultTrue;
+}
+
+/** Map upstream bank rows to `PayoutBank` (handles `bank_name` / snake_case flags). */
+function normalizePayoutBank(raw: unknown): PayoutBank | null {
+  if (!raw || typeof raw !== "object") return null;
+  const b = raw as Record<string, unknown>;
+  const id = Number(b.id);
+  if (!Number.isFinite(id)) return null;
+  const nameCandidates = [
+    b.name,
+    b.bank_name,
+    b.bankName,
+    b.bank,
+    b.label,
+    b.title,
+    b.display_name,
+    b.displayName,
+  ];
+  let name = "";
+  for (const c of nameCandidates) {
+    if (typeof c === "string" && c.trim().length > 0) {
+      name = c.trim();
+      break;
+    }
+  }
+  if (!name) name = `Bank #${id}`;
+  const imps = coerceBool(b.imps ?? b.imps_enabled ?? b.is_imps, true);
+  const neft = coerceBool(b.neft ?? b.neft_enabled ?? b.is_neft, true);
+  return { id, name, imps, neft };
+}
+
+/** List merchants linked to the partner account (new in v2.1). */
+export async function fetchPayoutMerchants(): Promise<PayoutMerchantsResponse> {
+  const res = await fetch(`${PAYOUT}/merchants`, { cache: "no-store" });
+  let data: PayoutMerchantsResponse;
+  try {
+    data = (await res.json()) as PayoutMerchantsResponse;
+  } catch {
+    return { success: false, error: { message: `Unexpected response (HTTP ${res.status}).` } };
+  }
+  if (!res.ok) {
+    return { ...data, success: false, error: data.error ?? { message: payoutErrorMessage(data, res.status) } };
+  }
+  return data;
+}
+
+/** Bank list — returns JSON even on 403/401 so the UI can show API error text (e.g. missing payout permission). */
+export async function fetchPayoutBanks(query?: Record<string, string | boolean | undefined>): Promise<PayoutBanksResponse> {
+  const params = new URLSearchParams();
+  if (query) {
+    for (const [k, v] of Object.entries(query)) {
+      if (v === undefined) continue;
+      params.set(k, String(v));
+    }
+  }
+  const q = params.toString();
+  const url = `${PAYOUT}/banks${q ? `?${q}` : ""}`;
+  const res = await fetch(url, { cache: "no-store" });
+  let data: PayoutBanksResponse;
+  try {
+    data = (await res.json()) as PayoutBanksResponse;
+  } catch {
+    return {
+      success: false,
+      error: { message: `Unexpected response (HTTP ${res.status}).` },
+    };
+  }
+  if (!res.ok) {
+    return {
+      ...data,
+      success: false,
+      error: data.error ?? { message: payoutErrorMessage(data, res.status) },
+    };
+  }
+  if (data.success && Array.isArray(data.banks)) {
+    const banks = data.banks.map(normalizePayoutBank).filter((x): x is PayoutBank => x != null);
+    return { ...data, banks };
+  }
+  return data;
+}
+
+export async function verifyPayoutAccount(body: PayoutVerifyRequest): Promise<PayoutVerifyResponse> {
+  const res = await fetch(`${PAYOUT}/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  return (await res.json()) as PayoutVerifyResponse;
+}
+
+/** Initiate payout transfer. Pass `merchant_id` for dynamic selection or rely on env fallback. */
+export async function initiatePayoutTransfer(body: PayoutTransferRequest & { merchant_id?: string }): Promise<PayoutTransferResponse> {
+  const res = await fetch(`${PAYOUT}/transfer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  return (await res.json()) as PayoutTransferResponse;
+}
+
+export async function getPayoutStatus(params: { transactionId?: string; clientRefId?: string }): Promise<PayoutStatusResponse> {
+  const search = new URLSearchParams();
+  if (params.transactionId) search.set("transactionId", params.transactionId);
+  if (params.clientRefId) search.set("clientRefId", params.clientRefId);
+  const q = search.toString();
+  if (!q) throw new Error("transactionId or clientRefId required");
+  const res = await fetch(`${PAYOUT}/status?${q}`, { cache: "no-store" });
+  return (await res.json()) as PayoutStatusResponse;
+}
+
+/** Last ~20 payouts for the given merchant (or env fallback). */
+export async function listRecentPayouts(merchantId?: string): Promise<PayoutListResponse> {
+  const params = merchantId ? `?merchant_id=${encodeURIComponent(merchantId)}` : "";
+  const res = await fetch(`${PAYOUT}/list${params}`, { cache: "no-store" });
+  try {
+    return (await res.json()) as PayoutListResponse;
+  } catch {
+    return {
+      success: false,
+      error: { message: `Could not read payout list (HTTP ${res.status}).` },
+    };
+  }
 }

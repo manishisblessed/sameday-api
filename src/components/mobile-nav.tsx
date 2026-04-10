@@ -1,23 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { LayoutDashboard, ArrowLeftRight, HardDrive, Download, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useState } from "react";
-
-const links = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { href: "/machines", label: "POS Machines", icon: HardDrive },
-  { href: "/exports", label: "Exports", icon: Download },
-];
+import { getModuleNavLinks, isModuleNavActive, resolveModuleApiKey, moduleContextTitle } from "@/lib/api-module-nav";
 
 export function MobileNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
+  const apiKey = resolveModuleApiKey(pathname, searchParams);
+  const links = getModuleNavLinks(apiKey);
+  const contextLabel = moduleContextTitle(apiKey);
 
   return (
     <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b bg-white">
@@ -28,15 +26,19 @@ export function MobileNav() {
         <SheetContent side="left" className="w-64 p-0">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex items-center gap-3 px-5 py-5 border-b">
-            <Image src="/logo.jpeg" alt="Same Day Solution" width={40} height={40} className="rounded-lg" />
+            <Image src="/LOGO_Same_Day.jpeg" alt="Same Day Solution" width={40} height={40} className="rounded-lg" />
             <p className="font-semibold text-sm">Same Day Solution</p>
+          </div>
+          <div className="border-b px-4 py-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Module</p>
+            <p className="truncate text-xs font-semibold text-green-800">{contextLabel}</p>
           </div>
           <nav className="py-4 px-3 space-y-1">
             {links.map(({ href, label, icon: Icon }) => {
-              const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+              const active = isModuleNavActive(href, pathname, searchParams);
               return (
                 <Link
-                  key={href}
+                  key={href + label}
                   href={href}
                   onClick={() => setOpen(false)}
                   className={cn(
@@ -54,8 +56,11 @@ export function MobileNav() {
           </nav>
         </SheetContent>
       </Sheet>
-      <Image src="/logo.jpeg" alt="Same Day Solution" width={32} height={32} className="rounded" />
-      <p className="font-semibold text-sm">POS Partner API Portal</p>
+      <Image src="/LOGO_Same_Day.jpeg" alt="Same Day Solution" width={32} height={32} className="rounded" />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-sm truncate">{contextLabel}</p>
+        <p className="text-[10px] text-muted-foreground truncate">Same Day API Portal</p>
+      </div>
     </div>
   );
 }
