@@ -4,7 +4,7 @@ import type {
   MachineResponse,
   HealthResponse,
   ExportJobResponse,
-  PayoutMerchantsResponse,
+  PayoutBalanceResponse,
   PayoutBanksResponse,
   PayoutBank,
   PayoutVerifyResponse,
@@ -109,12 +109,12 @@ function normalizePayoutBank(raw: unknown): PayoutBank | null {
   return { id, name, imps, neft };
 }
 
-/** List merchants linked to the partner account (new in v2.1). */
-export async function fetchPayoutMerchants(): Promise<PayoutMerchantsResponse> {
-  const res = await fetch(`${PAYOUT}/merchants`, { cache: "no-store" });
-  let data: PayoutMerchantsResponse;
+/** Fetch partner wallet balance (v3.0). */
+export async function fetchPayoutBalance(): Promise<PayoutBalanceResponse> {
+  const res = await fetch(`${PAYOUT}/balance`, { cache: "no-store" });
+  let data: PayoutBalanceResponse;
   try {
-    data = (await res.json()) as PayoutMerchantsResponse;
+    data = (await res.json()) as PayoutBalanceResponse;
   } catch {
     return { success: false, error: { message: `Unexpected response (HTTP ${res.status}).` } };
   }
@@ -169,8 +169,8 @@ export async function verifyPayoutAccount(body: PayoutVerifyRequest): Promise<Pa
   return (await res.json()) as PayoutVerifyResponse;
 }
 
-/** Initiate payout transfer. Pass `merchant_id` for dynamic selection or rely on env fallback. */
-export async function initiatePayoutTransfer(body: PayoutTransferRequest & { merchant_id?: string }): Promise<PayoutTransferResponse> {
+/** Initiate payout transfer (v3.0 — debits partner wallet, no merchant_id needed). */
+export async function initiatePayoutTransfer(body: PayoutTransferRequest): Promise<PayoutTransferResponse> {
   const res = await fetch(`${PAYOUT}/transfer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -190,10 +190,9 @@ export async function getPayoutStatus(params: { transactionId?: string; clientRe
   return (await res.json()) as PayoutStatusResponse;
 }
 
-/** Last ~20 payouts for the given merchant (or env fallback). */
-export async function listRecentPayouts(merchantId?: string): Promise<PayoutListResponse> {
-  const params = merchantId ? `?merchant_id=${encodeURIComponent(merchantId)}` : "";
-  const res = await fetch(`${PAYOUT}/list${params}`, { cache: "no-store" });
+/** Last ~20 payouts for the partner (v3.0 — no merchant_id needed). */
+export async function listRecentPayouts(): Promise<PayoutListResponse> {
+  const res = await fetch(`${PAYOUT}/list`, { cache: "no-store" });
   try {
     return (await res.json()) as PayoutListResponse;
   } catch {

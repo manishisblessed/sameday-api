@@ -3,15 +3,18 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * POST /api/payout/unlock — verify the settlement access password.
  * Password is stored server-side in SETTLEMENT_PASSWORD env var.
+ * If SETTLEMENT_PASSWORD is not set, password gate is disabled (auto-unlock).
  * Returns a short-lived token (SHA-256 of password + date) for the browser session.
  */
 export async function POST(req: NextRequest) {
   const secret = process.env.SETTLEMENT_PASSWORD?.trim();
+
+  // If no password configured, auto-unlock (password gate disabled)
   if (!secret) {
-    return NextResponse.json(
-      { success: false, error: { message: "SETTLEMENT_PASSWORD not configured in .env.local." } },
-      { status: 503 }
-    );
+    const { createHash } = await import("node:crypto");
+    const today = new Date().toISOString().slice(0, 10);
+    const token = createHash("sha256").update(`no-password:${today}`).digest("hex");
+    return NextResponse.json({ success: true, token, passwordDisabled: true });
   }
 
   let body: { password?: string };

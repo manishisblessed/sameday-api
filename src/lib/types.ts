@@ -124,24 +124,13 @@ export interface TransactionFilters {
   page_size: number;
 }
 
-/** Payout Partner API (IMPS/NEFT) — POSTMAN-COLLECTION-PAYOUT.json v2.1+ (`merchant_id`; legacy `retailer_id` alias on upstream). */
+/** Payout Partner API (IMPS/NEFT) — POSTMAN-COLLECTION-PAYOUT.json v3.0 (dedicated partner wallet, no merchant_id). */
 
-/** Merchant linked to the partner account for payout (from List My Merchants). */
-export interface PayoutMerchant {
-  merchant_id: string;
-  name?: string;
-  business_name?: string;
-  email?: string;
-  phone?: string;
-  status?: string;
-  onboarded?: boolean;
-}
-
-export interface PayoutMerchantsResponse {
+/** Partner wallet balance response. */
+export interface PayoutBalanceResponse {
   success: boolean;
-  merchants?: PayoutMerchant[];
-  total?: number;
-  message?: string;
+  balance?: number;
+  is_frozen?: boolean;
   error?: { code?: string; message?: string };
 }
 

@@ -9,9 +9,9 @@ import {
   Send,
   ShieldCheck,
   Loader2,
-  Info,
   Lock,
   KeyRound,
+  Wallet,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,14 +33,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
-  fetchPayoutMerchants,
+  fetchPayoutBalance,
   fetchPayoutBanks,
   verifyPayoutAccount,
   initiatePayoutTransfer,
   getPayoutStatus,
   listRecentPayouts,
 } from "@/lib/client-api";
-import type { PayoutBank, PayoutListItem, PayoutMerchant } from "@/lib/types";
+import type { PayoutBank, PayoutListItem } from "@/lib/types";
 
 function payoutStatusBadge(status?: string) {
   const s = (status || "").toLowerCase();
@@ -59,6 +59,26 @@ function PasswordGate({ onUnlock, onBack }: { onUnlock: () => void; onBack: () =
   const [pw, setPw] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingDisabled, setCheckingDisabled] = useState(true);
+
+  // On mount, check if password gate is disabled
+  useEffect(() => {
+    fetch("/api/payout/unlock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "" }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && d.passwordDisabled && d.token) {
+          sessionStorage.setItem(TOKEN_KEY, d.token);
+          onUnlock();
+        } else {
+          setCheckingDisabled(false);
+        }
+      })
+      .catch(() => setCheckingDisabled(false));
+  }, [onUnlock]);
 
   const submit = async () => {
     setError(null);
@@ -82,6 +102,15 @@ function PasswordGate({ onUnlock, onBack }: { onUnlock: () => void; onBack: () =
       setLoading(false);
     }
   };
+
+  // Show loading while checking if password is disabled
+  if (checkingDisabled) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-gradient-to-b from-slate-50 via-violet-50/30 to-emerald-50/20 md:min-h-[calc(100vh-3.5rem)]">
@@ -203,25 +232,32 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
 
   useEffect(() => {
     const token = sessionStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setAuthState("locked");
-      return;
-    }
+    
+    // Check if password gate is enabled or if we have a valid token
     fetch("/api/payout/check-token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token: token || "" }),
     })
       .then((r) => r.json())
-      .then((d) => setAuthState(d.valid ? "unlocked" : "locked"))
+      .then((d) => {
+        if (d.passwordDisabled) {
+          // Password gate is disabled (SETTLEMENT_PASSWORD not set)
+          setAuthState("unlocked");
+        } else if (d.valid) {
+          setAuthState("unlocked");
+        } else {
+          setAuthState("locked");
+        }
+      })
       .catch(() => setAuthState("locked"));
   }, []);
 
-  // Merchants linked to the partner account (new in v2.1)
-  const [merchants, setMerchants] = useState<PayoutMerchant[]>([]);
-  const [merchantsLoading, setMerchantsLoading] = useState(true);
-  const [merchantsError, setMerchantsError] = useState<string | null>(null);
-  const [selectedMerchantId, setSelectedMerchantId] = useState<string>("");
+  // Partner wallet balance (v3.0)
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [walletFrozen, setWalletFrozen] = useState(false);
+  const [balanceLoading, setBalanceLoading] = useState(true);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
 
   const [banks, setBanks] = useState<PayoutBank[]>([]);
   const [banksLoading, setBanksLoading] = useState(true);
@@ -259,39 +295,34 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusSnapshot, setStatusSnapshot] = useState<string | null>(null);
 
-  // Load merchants on mount
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setMerchantsLoading(true);
-      setMerchantsError(null);
-      try {
-        const res = await fetchPayoutMerchants();
-        if (cancelled) return;
-        if (res.success && res.merchants) {
-          setMerchants(res.merchants);
-          // Auto-select first merchant
-          if (res.merchants.length > 0 && !selectedMerchantId) {
-            setSelectedMerchantId(res.merchants[0].merchant_id);
-          }
-        } else {
-          setMerchantsError(res.error?.message ?? res.message ?? "Could not load merchants");
-        }
-      } catch (e) {
-        if (!cancelled) setMerchantsError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!cancelled) setMerchantsLoading(false);
+  // Load wallet balance on mount (v3.0)
+  const loadBalance = useCallback(async () => {
+    setBalanceLoading(true);
+    setBalanceError(null);
+    try {
+      const res = await fetchPayoutBalance();
+      if (res.success) {
+        setWalletBalance(res.balance ?? 0);
+        setWalletFrozen(res.is_frozen ?? false);
+      } else {
+        setBalanceError(res.error?.message ?? "Could not load balance");
       }
-    })();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    } catch (e) {
+      setBalanceError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBalanceLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadBalance();
+  }, [loadBalance]);
 
   const loadList = useCallback(async () => {
     setListLoading(true);
     setListError(null);
     try {
-      const res = await listRecentPayouts(selectedMerchantId || undefined);
+      const res = await listRecentPayouts();
       if (res.success && res.transactions) setList(res.transactions);
       else setListError(res.error?.message ?? "Could not load payouts");
     } catch (e) {
@@ -299,11 +330,11 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
     } finally {
       setListLoading(false);
     }
-  }, [selectedMerchantId]);
+  }, []);
 
   useEffect(() => {
-    if (selectedMerchantId) loadList();
-  }, [loadList, selectedMerchantId]);
+    loadList();
+  }, [loadList]);
 
   useEffect(() => {
     let cancelled = false;
@@ -369,10 +400,6 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
 
   const onTransfer = async () => {
     setTransferMsg(null);
-    if (!selectedMerchantId) {
-      setTransferMsg("Select a merchant from 'List My Merchants' first.");
-      return;
-    }
     const bankId = Number(bankIdStr);
     const amt = Number(amount);
     if (!bankIdStr || !Number.isFinite(bankId)) {
@@ -409,7 +436,6 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
     setTransferLoading(true);
     try {
       const res = await initiatePayoutTransfer({
-        merchant_id: selectedMerchantId,
         accountNumber: acct.trim(),
         ifscCode: ifsc.trim().toUpperCase(),
         accountHolderName: holderName.trim(),
@@ -430,6 +456,7 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
             `Initiated · ${res.status ?? "PROCESSING"} · Debit ₹${res.total_debited ?? amt + (res.charges ?? 0)}`
         );
         loadList();
+        loadBalance();
       } else {
         const extra =
           res.wait_seconds != null ? ` Wait ${res.wait_seconds}s before retry.` : "";
@@ -548,37 +575,6 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                     </div>
 
                     <div className="space-y-4">
-                      {/* Merchant selector (v2.1) */}
-                      <div className="space-y-2">
-                        {fieldLabel("Merchant (wallet to debit)")}
-                        <Select
-                          value={selectedMerchantId}
-                          onValueChange={(v) => setSelectedMerchantId(v ?? "")}
-                        >
-                          <SelectTrigger className={styledInput}>
-                            <SelectValue placeholder={merchantsLoading ? "Loading merchants…" : merchants.length === 0 ? "No merchants linked" : "Select merchant"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {merchants.map((m) => (
-                              <SelectItem key={m.merchant_id} value={m.merchant_id}>
-                                <span className="font-medium">{m.business_name || m.name || m.merchant_id}</span>
-                                {m.status && m.status !== "active" && (
-                                  <span className="ml-2 text-xs text-amber-600">({m.status})</span>
-                                )}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {merchantsError && (
-                          <p className="text-xs font-medium text-red-600">{merchantsError}</p>
-                        )}
-                        {!merchantsLoading && merchants.length === 0 && !merchantsError && (
-                          <p className="text-xs text-amber-700">
-                            No merchants linked. Contact Same Day to link merchants to your account.
-                          </p>
-                        )}
-                      </div>
-
                       <div className="space-y-2">
                         {fieldLabel("Search bank")}
                         <div className="flex gap-2">
@@ -673,24 +669,46 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
               </div>
 
               <div className="lg:col-span-2 space-y-4">
+                {/* Wallet balance card (v3.0) */}
+                <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-emerald-600 to-teal-700 p-5 text-white shadow-lg shadow-emerald-500/20">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">Wallet Balance</h3>
+                    <button
+                      type="button"
+                      onClick={() => loadBalance()}
+                      className="rounded-lg p-1.5 text-emerald-200 transition hover:bg-white/10 hover:text-white"
+                      title="Refresh balance"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${balanceLoading ? "animate-spin" : ""}`} />
+                    </button>
+                  </div>
+                  {balanceError ? (
+                    <p className="mt-2 text-sm text-red-200">{balanceError}</p>
+                  ) : balanceLoading && walletBalance === null ? (
+                    <p className="mt-2 text-2xl font-bold text-emerald-100">Loading…</p>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-3xl font-bold">
+                        ₹{walletBalance?.toLocaleString("en-IN") ?? "0"}
+                      </p>
+                      {walletFrozen && (
+                        <p className="mt-1 text-xs font-medium text-amber-300">Wallet frozen — contact support</p>
+                      )}
+                    </>
+                  )}
+                  <p className="mt-2 text-xs text-emerald-200">Payouts debit this balance directly</p>
+                </div>
+
                 <div className="rounded-2xl border border-violet-200/60 bg-gradient-to-br from-violet-600 to-indigo-700 p-5 text-white shadow-lg shadow-violet-500/20">
                   <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-violet-200">How it works</h3>
                   <ol className="space-y-3 text-sm leading-relaxed text-violet-100">
-                    <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">1</span> Select merchant (whose wallet is debited)</li>
+                    <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">1</span> Check your wallet balance</li>
                     <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">2</span> Select bank &amp; enter account details</li>
                     <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">3</span> Verify beneficiary (optional, free)</li>
                     <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">4</span> Enter amount &amp; initiate IMPS/NEFT</li>
                     <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">5</span> Track status in real time</li>
                   </ol>
                 </div>
-
-                {merchants.length > 0 && (
-                  <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/90 p-5 shadow-sm">
-                    <p className="mb-1 text-xs font-medium text-emerald-600">Linked merchants</p>
-                    <p className="text-3xl font-bold text-emerald-700">{merchants.length}</p>
-                    <p className="text-xs text-emerald-600">Available for payout</p>
-                  </div>
-                )}
 
                 {banks.length > 0 && (
                   <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-sm">
