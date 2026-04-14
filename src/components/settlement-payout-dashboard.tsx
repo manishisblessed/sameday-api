@@ -637,30 +637,50 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                         <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder={selectedBank?.name ?? "Auto-filled on bank selection"} className={styledInput} />
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                      <div className="flex flex-wrap items-center gap-3 pt-2">
                         <Button
                           type="button"
-                          className="gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 text-white shadow-md shadow-emerald-500/20 hover:from-emerald-700 hover:to-teal-700"
+                          size="lg"
+                          className="gap-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 text-[15px] font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:from-emerald-700 hover:to-teal-700 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
                           onClick={onVerify}
                           disabled={verifyLoading || !acct.trim() || !ifsc.trim()}
                         >
-                          {verifyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                          {verifyLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
                           Verify account
                         </Button>
-                        <Button type="button" variant="outline" className="gap-2 rounded-xl" onClick={() => setStep(2)}>
-                          Skip to transfer
-                          <Send className="h-3.5 w-3.5" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="gap-2 rounded-xl text-violet-600 hover:bg-violet-50 hover:text-violet-700 transition-all"
+                          onClick={() => setStep(2)}
+                        >
+                          Proceed to transfer
+                          <Send className="h-4 w-4" />
                         </Button>
                       </div>
 
                       {verifyMsg && (
-                        <div className={`animate-in fade-in slide-in-from-bottom-2 rounded-xl border px-4 py-3 text-sm ${
+                        <div className={`animate-in fade-in slide-in-from-bottom-2 duration-300 rounded-xl border px-4 py-3.5 text-sm ${
                           holderName
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                            : "border-amber-200 bg-amber-50 text-amber-900"
+                            ? "border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-900 shadow-sm shadow-emerald-500/10"
+                            : "border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900 shadow-sm shadow-amber-500/10"
                         }`}>
-                          {holderName && <p className="mb-0.5 font-semibold">{holderName}</p>}
-                          <p>{verifyMsg}</p>
+                          {holderName && (
+                            <div className="mb-1 flex items-center gap-2">
+                              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                              <p className="font-bold text-emerald-800">{holderName}</p>
+                            </div>
+                          )}
+                          <p className={holderName ? "text-emerald-700" : ""}>{verifyMsg}</p>
+                          {holderName && (
+                            <button
+                              type="button"
+                              onClick={() => setStep(2)}
+                              className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors"
+                            >
+                              Proceed to transfer <Send className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -669,34 +689,54 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
               </div>
 
               <div className="lg:col-span-2 space-y-4">
-                {/* Wallet balance card (v3.0) */}
-                <div className="rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-emerald-600 to-teal-700 p-5 text-white shadow-lg shadow-emerald-500/20">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">Wallet Balance</h3>
-                    <button
-                      type="button"
-                      onClick={() => loadBalance()}
-                      className="rounded-lg p-1.5 text-emerald-200 transition hover:bg-white/10 hover:text-white"
-                      title="Refresh balance"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${balanceLoading ? "animate-spin" : ""}`} />
-                    </button>
+                <div className="overflow-hidden rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-emerald-600 via-emerald-600 to-teal-700 p-5 text-white shadow-xl shadow-emerald-500/20 relative">
+                  <div className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10 blur-xl" aria-hidden />
+                  <div className="pointer-events-none absolute -bottom-4 -left-4 h-20 w-20 rounded-full bg-teal-400/15 blur-lg" aria-hidden />
+                  <div className="relative">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="h-5 w-5 text-emerald-200" />
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-emerald-200">Wallet Balance</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => loadBalance()}
+                        className="rounded-lg p-1.5 text-emerald-200 transition-all hover:bg-white/15 hover:text-white hover:rotate-180 duration-500"
+                        title="Refresh balance"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${balanceLoading ? "animate-spin" : ""}`} />
+                      </button>
+                    </div>
+                    {balanceError ? (
+                      <div className="mt-3">
+                        <p className="text-sm text-red-200">{balanceError}</p>
+                        <button
+                          type="button"
+                          onClick={() => loadBalance()}
+                          className="mt-2 text-xs font-medium text-emerald-200 underline underline-offset-2 hover:text-white transition-colors"
+                        >
+                          Tap to retry
+                        </button>
+                      </div>
+                    ) : balanceLoading && walletBalance === null ? (
+                      <div className="mt-3 flex items-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin text-emerald-200" />
+                        <span className="text-lg text-emerald-100">Loading…</span>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="mt-2 text-4xl font-extrabold tracking-tight">
+                          ₹{walletBalance?.toLocaleString("en-IN") ?? "0"}
+                        </p>
+                        {walletFrozen && (
+                          <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-300">
+                            <Lock className="h-3.5 w-3.5" /> Wallet frozen — contact support
+                          </p>
+                        )}
+                      </>
+                    )}
+                    <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-emerald-300/80">Payouts debit this balance directly</p>
                   </div>
-                  {balanceError ? (
-                    <p className="mt-2 text-sm text-red-200">{balanceError}</p>
-                  ) : balanceLoading && walletBalance === null ? (
-                    <p className="mt-2 text-2xl font-bold text-emerald-100">Loading…</p>
-                  ) : (
-                    <>
-                      <p className="mt-1 text-3xl font-bold">
-                        ₹{walletBalance?.toLocaleString("en-IN") ?? "0"}
-                      </p>
-                      {walletFrozen && (
-                        <p className="mt-1 text-xs font-medium text-amber-300">Wallet frozen — contact support</p>
-                      )}
-                    </>
-                  )}
-                  <p className="mt-2 text-xs text-emerald-200">Payouts debit this balance directly</p>
                 </div>
 
                 <div className="rounded-2xl border border-violet-200/60 bg-gradient-to-br from-violet-600 to-indigo-700 p-5 text-white shadow-lg shadow-violet-500/20">
@@ -785,13 +825,24 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                     </div>
 
                     {transferMsg && (
-                      <div className={`animate-in fade-in slide-in-from-bottom-2 rounded-xl border px-4 py-3 text-sm ${
+                      <div className={`animate-in fade-in slide-in-from-bottom-2 duration-300 rounded-xl border px-4 py-3.5 text-sm ${
                         lastTxnId
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                          : "border-red-200 bg-red-50 text-red-800"
+                          ? "border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-900 shadow-sm shadow-emerald-500/10"
+                          : "border-red-200 bg-gradient-to-r from-red-50 to-rose-50 text-red-800 shadow-sm shadow-red-500/10"
                       }`}>
-                        <p>{transferMsg}</p>
-                        {lastTxnId && <p className="mt-1 font-mono text-xs text-emerald-700">ID: {lastTxnId}</p>}
+                        <p className="font-medium">{transferMsg}</p>
+                        {lastTxnId && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <p className="font-mono text-xs text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-md">ID: {lastTxnId}</p>
+                            <button
+                              type="button"
+                              onClick={() => { setStatusId(lastTxnId); setStep(3); }}
+                              className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors underline underline-offset-2"
+                            >
+                              Track status
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
 
