@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiFetch } from "@/lib/api";
+import { safeStatus } from "@/lib/api-status";
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -9,5 +10,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: { message: "Invalid JSON body" } }, { status: 400 });
   }
   const result = await apiFetch("/api/partner/payout/verify", { method: "POST", body });
-  return NextResponse.json(result.data, { status: result.status });
+  return NextResponse.json(result.data, { status: safeStatus(result.status) });
 }

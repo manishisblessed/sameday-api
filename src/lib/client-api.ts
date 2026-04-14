@@ -112,6 +112,10 @@ function normalizePayoutBank(raw: unknown): PayoutBank | null {
 /** Fetch partner wallet balance (v3.0). */
 export async function fetchPayoutBalance(): Promise<PayoutBalanceResponse> {
   const res = await fetch(`${PAYOUT}/balance`, { cache: "no-store" });
+  const ct = res.headers.get("content-type") ?? "";
+  if (!ct.includes("application/json")) {
+    return { success: false, error: { message: `Balance endpoint unavailable (HTTP ${res.status}).` } };
+  }
   let data: PayoutBalanceResponse;
   try {
     data = (await res.json()) as PayoutBalanceResponse;
