@@ -18,6 +18,7 @@ import {
   MoveLeft,
   ChevronRight,
   Sparkles,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -40,6 +41,7 @@ import { Button } from "@/components/ui/button";
 import { fetchTransactions } from "@/lib/client-api";
 import type { Transaction, TransactionResponse } from "@/lib/types";
 import { SettlementPayoutDashboard } from "@/components/settlement-payout-dashboard";
+import { ShadvalSettlementDashboard } from "@/components/shadval-settlement-dashboard";
 
 const PIE_COLORS = ["#16a34a", "#ea580c", "#2563eb", "#9333ea", "#dc2626", "#ca8a04"];
 
@@ -47,6 +49,7 @@ type ApiKey =
   | "pos-transaction-api"
   | "bbps"
   | "settlement"
+  | "payout-2-shadval"
   | "dmt"
   | "aeps"
   | "recharges";
@@ -62,6 +65,8 @@ type ApiOption = {
     chip: string;
     corner: string;
   };
+  /** Hide the home-grid card but keep the key as a valid route (reached from sub-nav). */
+  hideOnHome?: boolean;
 };
 
 const API_OPTIONS: ApiOption[] = [
@@ -99,6 +104,18 @@ const API_OPTIONS: ApiOption[] = [
     },
   },
   {
+    key: "payout-2-shadval",
+    label: "Payout-2 SHADVAL",
+    description: "Settlement-2 via SHADVAL Pay — verified accounts, IMPS/NEFT/RTGS.",
+    icon: Send,
+    accent: {
+      orb: "bg-orange-400/35",
+      chip: "bg-orange-500/[0.13] text-orange-900 ring-1 ring-orange-500/25 shadow-inner shadow-orange-900/5",
+      corner: "from-orange-500/20 to-amber-500/5",
+    },
+    hideOnHome: true,
+  },
+  {
     key: "dmt",
     label: "DMT",
     description: "Money transfer throughput and status trend overview.",
@@ -132,6 +149,8 @@ const API_OPTIONS: ApiOption[] = [
     },
   },
 ];
+
+const HOME_API_OPTIONS = API_OPTIONS.filter((option) => !option.hideOnHome);
 
 function groupByDate(txns: Transaction[]) {
   const map = new Map<string, { date: string; count: number; amount: number }>();
@@ -275,7 +294,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
-            {API_OPTIONS.map((api, index) => {
+            {HOME_API_OPTIONS.map((api, index) => {
               const Icon = api.icon;
               const n = String(index + 1).padStart(2, "0");
               return (
@@ -355,6 +374,10 @@ export default function DashboardPage() {
 
   if (selectedApi === "settlement") {
     return <SettlementPayoutDashboard onBack={resetSelection} />;
+  }
+
+  if (selectedApi === "payout-2-shadval") {
+    return <ShadvalSettlementDashboard onBack={resetSelection} />;
   }
 
   const selectedApiOption = API_OPTIONS.find((option) => option.key === selectedApi);

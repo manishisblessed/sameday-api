@@ -249,3 +249,115 @@ export interface PayoutListResponse {
   transactions?: PayoutListItem[];
   error?: { code?: string; message?: string };
 }
+
+/** SHADVAL Settlement-2 API Types */
+
+export interface ShadvalBalanceResponse {
+  success: boolean;
+  balance?: number;
+  is_frozen?: boolean;
+  freeze_reason?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface ShadvalAccount {
+  id: string;
+  account_number: string;
+  ifsc_code: string;
+  account_holder_name: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_mobile?: string;
+  is_verified: boolean;
+  verified_name?: string;
+  is_active?: boolean;
+  created_at?: string;
+}
+
+export interface ShadvalAddAccountRequest {
+  account_number: string;
+  ifsc_code: string;
+  account_holder_name: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_mobile?: string;
+}
+
+export interface ShadvalAddAccountResponse {
+  success: boolean;
+  verified?: boolean;
+  verification_status?: string;
+  verified_name?: string;
+  account?: ShadvalAccount;
+  charge_deducted?: number;
+  message?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface ShadvalAccountsResponse {
+  success: boolean;
+  accounts?: ShadvalAccount[];
+  count?: number;
+  error?: { code?: string; message?: string };
+}
+
+export interface ShadvalChargesResponse {
+  success: boolean;
+  charges?: number;
+  total_debit?: number;
+  amount?: number;
+  mode?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface ShadvalTransferRequest {
+  account_id: string;
+  amount: number;
+  mode?: "IMPS" | "NEFT" | "RTGS";
+  narration?: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_mobile?: string;
+  contact_details?: {
+    name?: string;
+    email?: string;
+    mobile?: string;
+  };
+}
+
+export interface ShadvalTransaction {
+  id?: string;
+  reference_id?: string;
+  order_id?: string;
+  utr?: string;
+  amount?: number;
+  charges?: number;
+  total_debited?: number;
+  mode?: string;
+  status?: string;
+  status_message?: string;
+  account_number?: string;
+  account_holder_name?: string;
+  ifsc_code?: string;
+  created_at?: string;
+}
+
+export interface ShadvalTransferResponse {
+  success: boolean;
+  transaction?: ShadvalTransaction;
+  message?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface ShadvalStatusResponse {
+  success: boolean;
+  transaction?: ShadvalTransaction;
+  error?: { code?: string; message?: string };
+}
+
+export interface ShadvalListResponse {
+  success: boolean;
+  transactions?: ShadvalTransaction[];
+  count?: number;
+  error?: { code?: string; message?: string };
+}

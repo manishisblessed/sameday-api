@@ -12,6 +12,7 @@ import {
   Smartphone,
   WalletCards,
   Layers,
+  Banknote,
 } from "lucide-react";
 
 export type ModuleNavItem = {
@@ -37,6 +38,7 @@ export function resolveModuleApiKey(pathname: string, searchParams: URLSearchPar
 export function moduleContextTitle(apiKey: string | null): string {
   switch (apiKey) {
     case "settlement":
+    case "payout-2-shadval":
       return "Settlement · Payout";
     case "bbps":
       return "BBPS";
@@ -68,8 +70,12 @@ export function getModuleNavLinks(apiKey: string | null): ModuleNavItem[] {
     return pos;
   }
 
-  if (apiKey === "settlement") {
-    return [modules, { href: "/?api=settlement", label: "Payouts", icon: Send }];
+  if (apiKey === "settlement" || apiKey === "payout-2-shadval") {
+    return [
+      modules,
+      { href: "/?api=settlement", label: "Payouts", icon: Send },
+      { href: "/?api=payout-2-shadval", label: "Payouts-SHADVAL", icon: Banknote },
+    ];
   }
 
   if (apiKey === "bbps") {

@@ -13,6 +13,15 @@ import type {
   PayoutListResponse,
   PayoutVerifyRequest,
   PayoutTransferRequest,
+  ShadvalBalanceResponse,
+  ShadvalAccountsResponse,
+  ShadvalAddAccountRequest,
+  ShadvalAddAccountResponse,
+  ShadvalChargesResponse,
+  ShadvalTransferRequest,
+  ShadvalTransferResponse,
+  ShadvalStatusResponse,
+  ShadvalListResponse,
 } from "./types";
 
 const PROXY = "/api/proxy";
@@ -204,5 +213,94 @@ export async function listRecentPayouts(): Promise<PayoutListResponse> {
       success: false,
       error: { message: `Could not read payout list (HTTP ${res.status}).` },
     };
+  }
+}
+
+// ─── SHADVAL Settlement-2 API ────────────────────────────────────────────────
+
+const SHADVAL = "/api/payout-2-shadval";
+
+export async function fetchShadvalBalance(): Promise<ShadvalBalanceResponse> {
+  const res = await fetch(`${SHADVAL}/balance`, { cache: "no-store" });
+  try {
+    return (await res.json()) as ShadvalBalanceResponse;
+  } catch {
+    return { success: false, error: { message: `Balance unavailable (HTTP ${res.status}).` } };
+  }
+}
+
+export async function fetchShadvalAccounts(): Promise<ShadvalAccountsResponse> {
+  const res = await fetch(`${SHADVAL}/accounts`, { cache: "no-store" });
+  try {
+    return (await res.json()) as ShadvalAccountsResponse;
+  } catch {
+    return { success: false, error: { message: `Could not load accounts (HTTP ${res.status}).` } };
+  }
+}
+
+export async function addShadvalAccount(body: ShadvalAddAccountRequest): Promise<ShadvalAddAccountResponse> {
+  const res = await fetch(`${SHADVAL}/accounts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as ShadvalAddAccountResponse;
+  } catch {
+    return { success: false, error: { message: `Add account failed (HTTP ${res.status}).` } };
+  }
+}
+
+export async function deleteShadvalAccount(id: string): Promise<{ success: boolean; message?: string; error?: { message?: string } }> {
+  const res = await fetch(`${SHADVAL}/accounts?id=${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+  try {
+    return await res.json();
+  } catch {
+    return { success: false, error: { message: `Delete failed (HTTP ${res.status}).` } };
+  }
+}
+
+export async function fetchShadvalCharges(amount: number, mode: string = "IMPS"): Promise<ShadvalChargesResponse> {
+  const res = await fetch(`${SHADVAL}/charges?amount=${amount}&mode=${mode}`, { cache: "no-store" });
+  try {
+    return (await res.json()) as ShadvalChargesResponse;
+  } catch {
+    return { success: false, error: { message: `Charges unavailable (HTTP ${res.status}).` } };
+  }
+}
+
+export async function initiateShadvalTransfer(body: ShadvalTransferRequest): Promise<ShadvalTransferResponse> {
+  const res = await fetch(`${SHADVAL}/transfer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as ShadvalTransferResponse;
+  } catch {
+    return { success: false, error: { message: `Transfer failed (HTTP ${res.status}).` } };
+  }
+}
+
+export async function getShadvalStatus(referenceId: string): Promise<ShadvalStatusResponse> {
+  const res = await fetch(`${SHADVAL}/status?reference_id=${encodeURIComponent(referenceId)}`, { cache: "no-store" });
+  try {
+    return (await res.json()) as ShadvalStatusResponse;
+  } catch {
+    return { success: false, error: { message: `Status unavailable (HTTP ${res.status}).` } };
+  }
+}
+
+export async function listShadvalTransactions(limit: number = 20): Promise<ShadvalListResponse> {
+  const res = await fetch(`${SHADVAL}/status?list=true&limit=${limit}`, { cache: "no-store" });
+  try {
+    return (await res.json()) as ShadvalListResponse;
+  } catch {
+    return { success: false, error: { message: `Could not load transactions (HTTP ${res.status}).` } };
   }
 }
