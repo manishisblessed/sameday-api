@@ -42,6 +42,7 @@ import { fetchTransactions } from "@/lib/client-api";
 import type { Transaction, TransactionResponse } from "@/lib/types";
 import { SettlementPayoutDashboard } from "@/components/settlement-payout-dashboard";
 import { ShadvalSettlementDashboard } from "@/components/shadval-settlement-dashboard";
+import { BbpsDashboard } from "@/components/bbps-dashboard";
 
 const PIE_COLORS = ["#16a34a", "#ea580c", "#2563eb", "#9333ea", "#dc2626", "#ca8a04"];
 
@@ -378,6 +379,10 @@ export default function DashboardPage() {
 
   if (selectedApi === "payout-2-shadval") {
     return <ShadvalSettlementDashboard onBack={resetSelection} />;
+  }
+
+  if (selectedApi === "bbps") {
+    return <BbpsDashboard onBack={resetSelection} />;
   }
 
   const selectedApiOption = API_OPTIONS.find((option) => option.key === selectedApi);

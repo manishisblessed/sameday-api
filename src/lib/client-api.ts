@@ -22,6 +22,19 @@ import type {
   ShadvalTransferResponse,
   ShadvalStatusResponse,
   ShadvalListResponse,
+  BbpsCategoriesResponse,
+  BbpsBillersResponse,
+  BbpsBillerInfoResponse,
+  BbpsFetchBillRequest,
+  BbpsFetchBillResponse,
+  BbpsPayBillRequest,
+  BbpsPayBillResponse,
+  BbpsTransactionStatusRequest,
+  BbpsTransactionStatusResponse,
+  BbpsComplaintRegisterRequest,
+  BbpsComplaintRegisterResponse,
+  BbpsComplaintTrackRequest,
+  BbpsComplaintTrackResponse,
 } from "./types";
 
 const PROXY = "/api/proxy";
@@ -302,5 +315,121 @@ export async function listShadvalTransactions(limit: number = 20): Promise<Shadv
     return (await res.json()) as ShadvalListResponse;
   } catch {
     return { success: false, error: { message: `Could not load transactions (HTTP ${res.status}).` } };
+  }
+}
+
+// ─── BBPS Bill Payment API ───────────────────────────────────────────────────
+
+const BBPS_PROXY = "/api/proxy/api/partner/bbps";
+
+export async function fetchBbpsCategories(): Promise<BbpsCategoriesResponse> {
+  const res = await fetch(`${BBPS_PROXY}/categories`, { cache: "no-store" });
+  try {
+    return (await res.json()) as BbpsCategoriesResponse;
+  } catch {
+    return { success: false, error: { message: `Categories unavailable (HTTP ${res.status}).` } };
+  }
+}
+
+export async function fetchBbpsBillers(category: string): Promise<BbpsBillersResponse> {
+  const res = await fetch(`${BBPS_PROXY}/billers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      category,
+      paymentChannelName1: "INT",
+      paymentChannelName2: "AGT",
+      paymentChannelName3: "",
+    }),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as BbpsBillersResponse;
+  } catch {
+    return { success: false, error: { message: `Billers unavailable (HTTP ${res.status}).` } };
+  }
+}
+
+export async function fetchBbpsBillerInfo(biller_id: string): Promise<BbpsBillerInfoResponse> {
+  const res = await fetch(`${BBPS_PROXY}/biller-info`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ biller_id }),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as BbpsBillerInfoResponse;
+  } catch {
+    return { success: false, error: { message: `Biller info unavailable (HTTP ${res.status}).` } };
+  }
+}
+
+export async function fetchBbpsBill(body: BbpsFetchBillRequest): Promise<BbpsFetchBillResponse> {
+  const res = await fetch(`${BBPS_PROXY}/bill/fetch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as BbpsFetchBillResponse;
+  } catch {
+    return { success: false, error: { message: `Bill fetch failed (HTTP ${res.status}).` } };
+  }
+}
+
+export async function payBbpsBill(body: BbpsPayBillRequest): Promise<BbpsPayBillResponse> {
+  const res = await fetch(`${BBPS_PROXY}/bill/pay`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as BbpsPayBillResponse;
+  } catch {
+    return { success: false, error: { message: `Payment failed (HTTP ${res.status}).` } };
+  }
+}
+
+export async function fetchBbpsTransactionStatus(body: BbpsTransactionStatusRequest): Promise<BbpsTransactionStatusResponse> {
+  const res = await fetch(`${BBPS_PROXY}/transaction-status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as BbpsTransactionStatusResponse;
+  } catch {
+    return { success: false, error: { message: `Status unavailable (HTTP ${res.status}).` } };
+  }
+}
+
+export async function registerBbpsComplaint(body: BbpsComplaintRegisterRequest): Promise<BbpsComplaintRegisterResponse> {
+  const res = await fetch(`${BBPS_PROXY}/complaint/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as BbpsComplaintRegisterResponse;
+  } catch {
+    return { success: false, error: { message: `Complaint registration failed (HTTP ${res.status}).` } };
+  }
+}
+
+export async function trackBbpsComplaint(body: BbpsComplaintTrackRequest): Promise<BbpsComplaintTrackResponse> {
+  const res = await fetch(`${BBPS_PROXY}/complaint/track`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as BbpsComplaintTrackResponse;
+  } catch {
+    return { success: false, error: { message: `Complaint tracking failed (HTTP ${res.status}).` } };
   }
 }

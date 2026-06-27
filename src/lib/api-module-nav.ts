@@ -79,7 +79,12 @@ export function getModuleNavLinks(apiKey: string | null): ModuleNavItem[] {
   }
 
   if (apiKey === "bbps") {
-    return [modules, { href: "/?api=bbps", label: "BBPS dashboard", icon: Building2 }];
+    return [
+      modules,
+      { href: "/?api=bbps", label: "BBPS dashboard", icon: Building2 },
+      { href: "/?api=bbps&view=status", label: "Transaction Status", icon: Layers },
+      { href: "/?api=bbps&view=complaints", label: "Complaints", icon: Layers },
+    ];
   }
 
   if (apiKey === "dmt") {

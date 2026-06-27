@@ -361,3 +361,197 @@ export interface ShadvalListResponse {
   count?: number;
   error?: { code?: string; message?: string };
 }
+
+/** BBPS Bill Payment API Types */
+
+export interface BbpsCategoriesResponse {
+  success: boolean;
+  categories?: string[];
+  count?: number;
+  error?: { code?: string; message?: string };
+}
+
+export interface BbpsBiller {
+  biller_id: string;
+  biller_name: string;
+  biller_category?: string;
+  [key: string]: unknown;
+}
+
+export interface BbpsBillersResponse {
+  success: boolean;
+  data?: BbpsBiller[];
+  count?: number;
+  error?: { code?: string; message?: string };
+}
+
+export interface BbpsInputParam {
+  paramName: string;
+  dataType?: string;
+  isOptional?: boolean | string;
+  minLength?: number;
+  maxLength?: number;
+  regex?: string;
+  values?: string[];
+  [key: string]: unknown;
+}
+
+export interface BbpsBillerInfo {
+  billerId: string;
+  billerName: string;
+  billerCategory?: string;
+  billerInputParams?: BbpsInputParam[];
+  supportBillFetch?: boolean | string;
+  amountExactness?: string;
+  billerPaymentModes?: string[];
+  [key: string]: unknown;
+}
+
+export interface BbpsBillerInfoResponse {
+  success: boolean;
+  biller_info?: BbpsBillerInfo;
+  error?: { code?: string; message?: string };
+}
+
+export interface BbpsFetchBillRequest {
+  biller_id: string;
+  consumer_number?: string;
+  input_params?: { paramName: string; paramValue: string }[];
+  payment_mode?: string;
+  init_channel?: string;
+  ip?: string;
+  mac?: string;
+  enquiry_id?: string;
+}
+
+export interface BbpsBillerResponse {
+  billAmount?: string;
+  billDate?: string;
+  customerName?: string;
+  dueDate?: string;
+  [key: string]: unknown;
+}
+
+export interface BbpsBill {
+  bill_amount?: number | string;
+  consumer_name?: string;
+  bill_date?: string;
+  due_date?: string;
+  bill_number?: string;
+  [key: string]: unknown;
+}
+
+export interface BbpsFetchBillResponse {
+  success: boolean;
+  data?: {
+    responseCode?: string;
+    billerResponse?: BbpsBillerResponse;
+    inputParams?: { paramName: string; paramValue: string }[];
+    additionalInfo?: unknown[];
+    [key: string]: unknown;
+  };
+  reqId?: string;
+  bill?: BbpsBill;
+  error?: { code?: string; message?: string };
+}
+
+export interface BbpsPayBillRequest {
+  retailer_id: string;
+  biller_id: string;
+  biller_name: string;
+  consumer_number: string;
+  amount: number;
+  consumer_name?: string;
+  due_date?: string;
+  bill_date?: string;
+  bill_number?: string;
+  biller_category?: string;
+  reqId?: string;
+  payment_mode?: string;
+  pan_number?: string;
+  customer_name?: string;
+  customer_email?: string;
+  customer_mobile?: string;
+  upi_id?: string;
+  additional_info?: {
+    category?: string;
+    reqId?: string;
+    inputParams?: { paramName: string; paramValue: string }[];
+    billerResponse?: BbpsBillerResponse;
+    additionalInfo?: unknown[];
+  };
+}
+
+export interface BbpsPayBillResponse {
+  success: boolean;
+  transaction_id?: string;
+  agent_transaction_id?: string;
+  bbps_transaction_id?: string;
+  status?: string;
+  payment_status?: string;
+  error_code?: string;
+  error_message?: string;
+  error?: { code?: string; message?: string };
+  wallet_balance?: number;
+  charge?: number;
+  required_amount?: number;
+}
+
+export interface BbpsTransactionStatusRequest {
+  transaction_id: string;
+  track_type?: string;
+}
+
+export interface BbpsTransactionStatusResponse {
+  success: boolean;
+  status?: string;
+  message?: string;
+  data?: {
+    reqId?: string;
+    totalAmount?: number | string;
+    serviceCharge?: number | string;
+    transactionAmount?: number | string;
+    referenceNo?: string;
+    transaction_id?: string;
+    status?: string;
+    remark?: string;
+    [key: string]: unknown;
+  };
+  error?: { code?: string; message?: string };
+}
+
+export interface BbpsComplaintRegisterRequest {
+  transaction_id: string;
+  complaint_type?: string;
+  description: string;
+  complaint_disposition?: string;
+}
+
+export interface BbpsComplaintRegisterResponse {
+  success: boolean;
+  data?: {
+    complaintAssigned?: string;
+    complaintId?: string;
+    responseCode?: string;
+    responseReason?: string;
+  };
+  error?: { code?: string; message?: string };
+}
+
+export interface BbpsComplaintTrackRequest {
+  complaint_id: string;
+  complaint_type?: string;
+}
+
+export interface BbpsComplaintTrackResponse {
+  success: boolean;
+  data?: {
+    complaintId?: string;
+    complaintType?: string;
+    status?: string;
+    description?: string;
+    resolution?: string;
+    [key: string]: unknown;
+  };
+  error?: { code?: string; message?: string };
+}
