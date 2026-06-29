@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Sparkles,
   Send,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -43,12 +44,14 @@ import type { Transaction, TransactionResponse } from "@/lib/types";
 import { SettlementPayoutDashboard } from "@/components/settlement-payout-dashboard";
 import { ShadvalSettlementDashboard } from "@/components/shadval-settlement-dashboard";
 import { BbpsDashboard } from "@/components/bbps-dashboard";
+import { Bbps2CreditCardDashboard } from "@/components/bbps2-credit-card-dashboard";
 
 const PIE_COLORS = ["#16a34a", "#ea580c", "#2563eb", "#9333ea", "#dc2626", "#ca8a04"];
 
 type ApiKey =
   | "pos-transaction-api"
   | "bbps"
+  | "bbps2-credit-card"
   | "settlement"
   | "payout-2-shadval"
   | "dmt"
@@ -91,6 +94,17 @@ const API_OPTIONS: ApiOption[] = [
       orb: "bg-sky-400/35",
       chip: "bg-sky-500/[0.13] text-sky-900 ring-1 ring-sky-500/25 shadow-inner shadow-sky-900/5",
       corner: "from-sky-500/20 to-indigo-500/5",
+    },
+  },
+  {
+    key: "bbps2-credit-card",
+    label: "BBPS-2 Credit Card",
+    description: "Credit card bill payments via Pay2New BBPS-2 integration.",
+    icon: CreditCard,
+    accent: {
+      orb: "bg-indigo-400/35",
+      chip: "bg-indigo-500/[0.13] text-indigo-900 ring-1 ring-indigo-500/25 shadow-inner shadow-indigo-900/5",
+      corner: "from-indigo-500/20 to-purple-500/5",
     },
   },
   {
@@ -383,6 +397,10 @@ export default function DashboardPage() {
 
   if (selectedApi === "bbps") {
     return <BbpsDashboard onBack={resetSelection} />;
+  }
+
+  if (selectedApi === "bbps2-credit-card") {
+    return <Bbps2CreditCardDashboard onBack={resetSelection} />;
   }
 
   const selectedApiOption = API_OPTIONS.find((option) => option.key === selectedApi);

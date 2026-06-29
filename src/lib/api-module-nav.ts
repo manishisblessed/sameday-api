@@ -13,6 +13,7 @@ import {
   WalletCards,
   Layers,
   Banknote,
+  CreditCard,
 } from "lucide-react";
 
 export type ModuleNavItem = {
@@ -42,6 +43,8 @@ export function moduleContextTitle(apiKey: string | null): string {
       return "Settlement · Payout";
     case "bbps":
       return "BBPS";
+    case "bbps2-credit-card":
+      return "BBPS-2 Credit Card";
     case "dmt":
       return "DMT";
     case "aeps":
@@ -82,8 +85,17 @@ export function getModuleNavLinks(apiKey: string | null): ModuleNavItem[] {
     return [
       modules,
       { href: "/?api=bbps", label: "BBPS dashboard", icon: Building2 },
+      { href: "/?api=bbps2-credit-card", label: "BBPS-2 Credit Card", icon: CreditCard },
       { href: "/?api=bbps&view=status", label: "Transaction Status", icon: Layers },
       { href: "/?api=bbps&view=complaints", label: "Complaints", icon: Layers },
+    ];
+  }
+
+  if (apiKey === "bbps2-credit-card") {
+    return [
+      modules,
+      { href: "/?api=bbps", label: "BBPS dashboard", icon: Building2 },
+      { href: "/?api=bbps2-credit-card", label: "BBPS-2 Credit Card", icon: CreditCard },
     ];
   }
 

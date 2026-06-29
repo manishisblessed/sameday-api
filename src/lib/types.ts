@@ -555,3 +555,91 @@ export interface BbpsComplaintTrackResponse {
   };
   error?: { code?: string; message?: string };
 }
+
+/** BBPS-2 Pay2New Credit Card Bill Payment API Types */
+
+export interface Pay2NewBiller {
+  product_code: string;
+  product_name: string;
+  service_id?: string;
+}
+
+export interface Pay2NewBillersResponse {
+  success: boolean;
+  billers?: Pay2NewBiller[];
+  count?: number;
+  service_id?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface Pay2NewChargesRequest {
+  retailer_id: string;
+  amount: number;
+}
+
+export interface Pay2NewCharges {
+  base_charge: number;
+  gst_percent: number;
+  gst_amount: number;
+  total_charge: number;
+}
+
+export interface Pay2NewChargesResponse {
+  success: boolean;
+  amount?: number;
+  scheme_name?: string;
+  charges?: Pay2NewCharges;
+  error?: { code?: string; message?: string };
+}
+
+export interface Pay2NewFetchBillRequest {
+  number: string;
+  product_code: string;
+  customer_number: string;
+  optional1?: string;
+  optional2?: string;
+  optional3?: string;
+  optional4?: string;
+  pincode?: string;
+}
+
+export interface Pay2NewBillData {
+  customer_name?: string;
+  amount?: number;
+  bill_date?: string;
+  due_date?: string;
+  [key: string]: unknown;
+}
+
+export interface Pay2NewFetchBillResponse {
+  success: boolean;
+  data?: Pay2NewBillData;
+  order_id?: string;
+  request_id?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface Pay2NewPayBillRequest {
+  retailer_id: string;
+  number: string;
+  amount: number;
+  product_code: string;
+  product_name?: string;
+  bill_fetch_ref: string;
+  customer_number: string;
+  optional1?: string;
+  optional2?: string;
+  optional3?: string;
+  optional4?: string;
+  pincode?: string;
+}
+
+export interface Pay2NewPayBillResponse {
+  success: boolean;
+  order_id?: string;
+  operator_reference?: string;
+  amount?: number;
+  charge?: number;
+  request_id?: string;
+  error?: { code?: string; message?: string };
+}

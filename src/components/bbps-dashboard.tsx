@@ -15,6 +15,9 @@ import {
   Receipt,
   FileWarning,
   Clock,
+  Lock,
+  KeyRound,
+  ShieldCheck,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
@@ -43,11 +46,220 @@ import type {
 
 type Step = "categories" | "billers" | "biller-info" | "fetch-bill" | "pay-bill" | "status";
 
+const BBPS_TOKEN_KEY = "bbps_unlock_token";
+
+function BbpsPasswordGate({ onUnlock, onBack }: { onUnlock: () => void; onBack: () => void }) {
+  const [pw, setPw] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [checkingDisabled, setCheckingDisabled] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/bbps/unlock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "" }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && d.passwordDisabled && d.token) {
+          sessionStorage.setItem(BBPS_TOKEN_KEY, d.token);
+          onUnlock();
+        } else {
+          setCheckingDisabled(false);
+        }
+      })
+      .catch(() => setCheckingDisabled(false));
+  }, [onUnlock]);
+
+  const submit = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/bbps/unlock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await res.json();
+      if (data.success && data.token) {
+        sessionStorage.setItem(BBPS_TOKEN_KEY, data.token);
+        onUnlock();
+      } else {
+        setError(data.error?.message ?? "Incorrect password.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Network error.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (checkingDisabled) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-gradient-to-b from-slate-50 via-emerald-50/30 to-teal-50/20 md:min-h-[calc(100vh-3.5rem)]">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_45%_at_50%_-10%,rgba(16,185,129,0.12),transparent)]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -right-24 top-1/3 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -left-20 bottom-1/4 h-56 w-56 rounded-full bg-teal-300/15 blur-3xl"
+        aria-hidden
+      />
+
+      <div className="relative flex min-h-[inherit] flex-col items-center justify-center px-4 py-10 sm:px-6">
+        <div className="w-full max-w-[400px] animate-in fade-in zoom-in-95 duration-300">
+          <div className="mb-6 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600/90">Protected</p>
+            <h2 className="mt-2 font-sans text-2xl font-bold tracking-tight text-slate-900 sm:text-[1.65rem]">
+              BBPS Bill Payment
+            </h2>
+            <p className="mx-auto mt-2 max-w-[340px] text-sm leading-relaxed text-slate-600">
+              This area handles bill payments via BBPS. Enter the access password to continue.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-1 shadow-[0_20px_50px_-12px_rgba(15,23,42,0.15)] ring-1 ring-white/60 backdrop-blur-md">
+            <div className="rounded-[0.9rem] bg-gradient-to-b from-white to-slate-50/80 px-6 pb-6 pt-7 sm:px-8">
+              <div className="mb-6 flex justify-center">
+                <div className="relative">
+                  <div className="absolute -inset-3 rounded-3xl bg-gradient-to-br from-emerald-400/25 to-teal-400/20 blur-xl" />
+                  <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-700 text-white shadow-lg shadow-emerald-500/30 ring-4 ring-white">
+                    <ShieldCheck className="h-8 w-8 opacity-95" strokeWidth={1.5} />
+                    <span className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-xl border-2 border-white bg-slate-900 text-white shadow-md">
+                      <Lock className="h-4 w-4" aria-hidden />
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label htmlFor="bbps-pw" className="text-sm font-medium text-slate-800">
+                    Access password
+                  </label>
+                  <Input
+                    id="bbps-pw"
+                    type="password"
+                    autoComplete="current-password"
+                    autoFocus
+                    value={pw}
+                    onChange={(e) => setPw(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !loading && pw.trim() && submit()}
+                    placeholder="••••••••"
+                    className="h-11 rounded-xl border-slate-200 bg-white text-base shadow-inner shadow-slate-900/5 placeholder:text-slate-400 focus-visible:border-emerald-400 focus-visible:ring-emerald-500/25 md:text-sm"
+                  />
+                </div>
+
+                {error && (
+                  <div
+                    role="alert"
+                    className="rounded-xl border border-red-200 bg-red-50/90 px-3.5 py-2.5 text-sm text-red-800"
+                  >
+                    {error}
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  size="lg"
+                  className="h-11 w-full gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-[15px] font-semibold text-white shadow-md shadow-emerald-500/25 transition hover:from-emerald-700 hover:to-emerald-800 disabled:opacity-60"
+                  onClick={submit}
+                  disabled={loading || !pw.trim()}
+                >
+                  {loading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <KeyRound className="h-5 w-5" />
+                  )}
+                  Unlock dashboard
+                </Button>
+
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center" aria-hidden>
+                    <span className="w-full border-t border-slate-200" />
+                  </div>
+                  <div className="relative flex justify-center text-[11px] uppercase tracking-wide text-slate-400">
+                    <span className="bg-gradient-to-b from-white to-slate-50/80 px-3">or</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100/80 hover:text-slate-900"
+                >
+                  <MoveLeft className="h-4 w-4 shrink-0" />
+                  Back to API modules
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-6 text-center text-[11px] leading-relaxed text-slate-500">
+            Session unlock is stored until you close this browser tab.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   onBack: () => void;
 }
 
 export function BbpsDashboard({ onBack }: Props) {
+  const [authState, setAuthState] = useState<"checking" | "locked" | "unlocked">("checking");
+
+  useEffect(() => {
+    const token = sessionStorage.getItem(BBPS_TOKEN_KEY);
+
+    fetch("/api/bbps/check-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: token || "" }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.passwordDisabled) {
+          setAuthState("unlocked");
+        } else if (d.valid) {
+          setAuthState("unlocked");
+        } else {
+          setAuthState("locked");
+        }
+      })
+      .catch(() => setAuthState("locked"));
+  }, []);
+
+  if (authState === "checking") {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
+
+  if (authState === "locked") {
+    return <BbpsPasswordGate onUnlock={() => setAuthState("unlocked")} onBack={onBack} />;
+  }
+
+  return <BbpsDashboardContent onBack={onBack} />;
+}
+
+function BbpsDashboardContent({ onBack }: Props) {
   const [step, setStep] = useState<Step>("categories");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

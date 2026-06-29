@@ -35,6 +35,13 @@ import type {
   BbpsComplaintRegisterResponse,
   BbpsComplaintTrackRequest,
   BbpsComplaintTrackResponse,
+  Pay2NewBillersResponse,
+  Pay2NewChargesRequest,
+  Pay2NewChargesResponse,
+  Pay2NewFetchBillRequest,
+  Pay2NewFetchBillResponse,
+  Pay2NewPayBillRequest,
+  Pay2NewPayBillResponse,
 } from "./types";
 
 const PROXY = "/api/proxy";
@@ -431,5 +438,60 @@ export async function trackBbpsComplaint(body: BbpsComplaintTrackRequest): Promi
     return (await res.json()) as BbpsComplaintTrackResponse;
   } catch {
     return { success: false, error: { message: `Complaint tracking failed (HTTP ${res.status}).` } };
+  }
+}
+
+// ─── BBPS-2 Pay2New Credit Card Bill Payment API ─────────────────────────────
+
+const PAY2NEW_PROXY = "/api/proxy/api/partner/pay2new";
+
+export async function fetchPay2NewBillers(): Promise<Pay2NewBillersResponse> {
+  const res = await fetch(`${PAY2NEW_PROXY}/billers`, { cache: "no-store" });
+  try {
+    return (await res.json()) as Pay2NewBillersResponse;
+  } catch {
+    return { success: false, error: { message: `Billers unavailable (HTTP ${res.status}).` } };
+  }
+}
+
+export async function fetchPay2NewCharges(body: Pay2NewChargesRequest): Promise<Pay2NewChargesResponse> {
+  const res = await fetch(`${PAY2NEW_PROXY}/charges`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as Pay2NewChargesResponse;
+  } catch {
+    return { success: false, error: { message: `Charges unavailable (HTTP ${res.status}).` } };
+  }
+}
+
+export async function fetchPay2NewBill(body: Pay2NewFetchBillRequest): Promise<Pay2NewFetchBillResponse> {
+  const res = await fetch(`${PAY2NEW_PROXY}/bill/fetch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as Pay2NewFetchBillResponse;
+  } catch {
+    return { success: false, error: { message: `Bill fetch failed (HTTP ${res.status}).` } };
+  }
+}
+
+export async function payPay2NewBill(body: Pay2NewPayBillRequest): Promise<Pay2NewPayBillResponse> {
+  const res = await fetch(`${PAY2NEW_PROXY}/bill/pay`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as Pay2NewPayBillResponse;
+  } catch {
+    return { success: false, error: { message: `Payment failed (HTTP ${res.status}).` } };
   }
 }
