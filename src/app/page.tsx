@@ -88,7 +88,7 @@ const API_OPTIONS: ApiOption[] = [
   {
     key: "bbps",
     label: "BBPS",
-    description: "Bill payments and service-wise success metrics.",
+    description: "Bill payments and credit card payments via BBPS.",
     icon: Landmark,
     accent: {
       orb: "bg-sky-400/35",
@@ -106,6 +106,7 @@ const API_OPTIONS: ApiOption[] = [
       chip: "bg-indigo-500/[0.13] text-indigo-900 ring-1 ring-indigo-500/25 shadow-inner shadow-indigo-900/5",
       corner: "from-indigo-500/20 to-purple-500/5",
     },
+    hideOnHome: true,
   },
   {
     key: "settlement",

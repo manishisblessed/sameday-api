@@ -28,15 +28,17 @@ import {
   fetchPay2NewCharges,
   fetchPay2NewBill,
   payPay2NewBill,
+  checkPay2NewBillStatus,
 } from "@/lib/client-api";
 import type {
   Pay2NewBiller,
   Pay2NewFetchBillResponse,
   Pay2NewChargesResponse,
   Pay2NewPayBillResponse,
+  Pay2NewBillStatusResponse,
 } from "@/lib/types";
 
-type Step = "billers" | "bill-form" | "bill-details" | "charges" | "payment-result";
+type Step = "billers" | "bill-form" | "bill-details" | "charges" | "payment-result" | "check-status";
 
 const BBPS2_TOKEN_KEY = "bbps2_unlock_token";
 
@@ -236,18 +238,23 @@ function Bbps2DashboardContent({ onBack }: Props) {
   // Bill form
   const [cardNumber, setCardNumber] = useState("");
   const [customerNumber, setCustomerNumber] = useState("");
-  const [pincode, setPincode] = useState("414002");
 
   // Bill data
   const [billData, setBillData] = useState<Pay2NewFetchBillResponse | null>(null);
   const [billFetchRef, setBillFetchRef] = useState("");
+  const [customAmount, setCustomAmount] = useState("");
+  const [useCustomAmount, setUseCustomAmount] = useState(false);
 
   // Charges
   const [chargesData, setChargesData] = useState<Pay2NewChargesResponse | null>(null);
-  const [retailerId, setRetailerId] = useState("");
 
   // Payment
   const [paymentResult, setPaymentResult] = useState<Pay2NewPayBillResponse | null>(null);
+
+  // Status check
+  const [statusResult, setStatusResult] = useState<Pay2NewBillStatusResponse | null>(null);
+  const [statusOrderId, setStatusOrderId] = useState("");
+  const [statusRequestId, setStatusRequestId] = useState("");
 
   // Stats
   const [stats, setStats] = useState({ totalRequests: 0, totalAmount: 0, success: 0, failed: 0 });
@@ -289,11 +296,11 @@ function Bbps2DashboardContent({ onBack }: Props) {
         number: cardNumber.trim(),
         product_code: selectedBiller.product_code,
         customer_number: customerNumber.trim(),
-        optional1: "",
+        optional1: customerNumber.trim(),
         optional2: "",
         optional3: "",
         optional4: "",
-        pincode: pincode.trim() || "414002",
+        pincode: "414002",
       });
       if (res.success) {
         setBillData(res);
@@ -311,14 +318,21 @@ function Bbps2DashboardContent({ onBack }: Props) {
     }
   };
 
+  const getPayAmount = () => {
+    if (useCustomAmount && customAmount.trim()) {
+      return Number(customAmount);
+    }
+    return Number(billData?.data?.amount || 0);
+  };
+
   const handleCheckCharges = async () => {
-    if (!billData?.data?.amount || !retailerId.trim()) return;
+    const payAmount = getPayAmount();
+    if (!payAmount || payAmount <= 0) return;
     setLoading(true);
     setError(null);
     try {
       const res = await fetchPay2NewCharges({
-        retailer_id: retailerId.trim(),
-        amount: billData.data.amount,
+        amount: payAmount,
       });
       if (res.success) {
         setChargesData(res);
@@ -334,24 +348,24 @@ function Bbps2DashboardContent({ onBack }: Props) {
   };
 
   const handlePayBill = async () => {
-    if (!selectedBiller || !billData?.data?.amount || !billFetchRef || !retailerId.trim()) return;
+    const payAmount = getPayAmount();
+    if (!selectedBiller || !payAmount || !billFetchRef) return;
     setLoading(true);
     setError(null);
     setStats((s) => ({ ...s, totalRequests: s.totalRequests + 1 }));
     try {
       const res = await payPay2NewBill({
-        retailer_id: retailerId.trim(),
         number: cardNumber.trim(),
-        amount: billData.data.amount,
+        amount: payAmount,
         product_code: selectedBiller.product_code,
         product_name: selectedBiller.product_name,
         bill_fetch_ref: billFetchRef,
         customer_number: customerNumber.trim(),
-        optional1: "",
+        optional1: customerNumber.trim(),
         optional2: "",
         optional3: "",
         optional4: "",
-        pincode: pincode.trim() || "414002",
+        pincode: "414002",
       });
       setPaymentResult(res);
       setStep("payment-result");
@@ -359,7 +373,7 @@ function Bbps2DashboardContent({ onBack }: Props) {
         setStats((s) => ({
           ...s,
           success: s.success + 1,
-          totalAmount: s.totalAmount + (billData.data?.amount || 0),
+          totalAmount: s.totalAmount + payAmount,
         }));
       } else {
         setStats((s) => ({ ...s, failed: s.failed + 1 }));
@@ -372,17 +386,53 @@ function Bbps2DashboardContent({ onBack }: Props) {
     }
   };
 
+  const handleCheckStatus = async (orderId?: string, requestId?: string) => {
+    const oid = orderId || statusOrderId.trim();
+    const rid = requestId || statusRequestId.trim();
+    if (!oid && !rid) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const body: Record<string, string> = {};
+      if (oid) body.order_id = oid;
+      if (rid) body.request_id = rid;
+      const res = await checkPay2NewBillStatus(body);
+      setStatusResult(res);
+      if (!res.success) {
+        setError(res.error?.message || "Status check failed");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Status check failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openStatusCheck = (orderId?: string, requestId?: string) => {
+    setStatusResult(null);
+    setStatusOrderId(orderId || "");
+    setStatusRequestId(requestId || "");
+    setStep("check-status");
+    setError(null);
+    if (orderId || requestId) {
+      handleCheckStatus(orderId, requestId);
+    }
+  };
+
   const resetFlow = () => {
     setStep("billers");
     setSelectedBiller(null);
     setCardNumber("");
     setCustomerNumber("");
-    setPincode("414002");
     setBillData(null);
     setBillFetchRef("");
+    setCustomAmount("");
+    setUseCustomAmount(false);
     setChargesData(null);
-    setRetailerId("");
     setPaymentResult(null);
+    setStatusResult(null);
+    setStatusOrderId("");
+    setStatusRequestId("");
     setError(null);
   };
 
@@ -406,6 +456,14 @@ function Bbps2DashboardContent({ onBack }: Props) {
         setStep("charges");
         setPaymentResult(null);
         break;
+      case "check-status":
+        if (paymentResult) {
+          setStep("payment-result");
+        } else {
+          setStep("billers");
+        }
+        setStatusResult(null);
+        break;
     }
   };
 
@@ -414,8 +472,8 @@ function Bbps2DashboardContent({ onBack }: Props) {
   );
 
   const errorDetails: Record<string, string> = {
-    INSUFFICIENT_BALANCE: "Retailer wallet balance is low. Please recharge wallet to proceed.",
-    FORBIDDEN: "Retailer not linked to partner account. Contact SameDaySolution admin.",
+    INSUFFICIENT_BALANCE: "Partner wallet balance is low. Please recharge wallet to proceed.",
+    WALLET_FROZEN: "Partner wallet is frozen. Contact SameDaySolution admin.",
     PAYMENT_FAILED: "Payment failed at provider. Wallet amount has been auto-refunded.",
     PROVIDER_ERROR: "Provider communication error. Wallet amount has been auto-refunded.",
     UNAUTHORIZED: "Invalid API key, expired timestamp, or bad signature.",
@@ -436,7 +494,7 @@ function Bbps2DashboardContent({ onBack }: Props) {
             Pay credit card bills via Pay2New ({billers.length} billers available)
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {step !== "billers" && (
             <Button variant="outline" size="sm" onClick={goBack}>
               <MoveLeft className="h-4 w-4" />
@@ -446,6 +504,12 @@ function Bbps2DashboardContent({ onBack }: Props) {
           {step !== "billers" && (
             <Button variant="outline" size="sm" onClick={resetFlow}>
               New Payment
+            </Button>
+          )}
+          {step !== "check-status" && (
+            <Button variant="outline" size="sm" onClick={() => openStatusCheck()}>
+              <Search className="h-4 w-4" />
+              Check Status
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={onBack}>
@@ -476,8 +540,13 @@ function Bbps2DashboardContent({ onBack }: Props) {
 
       {/* Step Progress */}
       <div className="flex items-center gap-1 text-xs text-muted-foreground overflow-x-auto pb-1">
-        {["Billers", "Card Details", "Fetch Bill", "Charges", "Pay Bill"].map((s, i) => {
-          const stepNames: Step[] = ["billers", "bill-form", "bill-details", "charges", "payment-result"];
+        {(step === "check-status"
+          ? ["Billers", "Card Details", "Fetch Bill", "Charges", "Pay Bill", "Status"]
+          : ["Billers", "Card Details", "Fetch Bill", "Charges", "Pay Bill"]
+        ).map((s, i) => {
+          const stepNames: Step[] = step === "check-status"
+            ? ["billers", "bill-form", "bill-details", "charges", "payment-result", "check-status"]
+            : ["billers", "bill-form", "bill-details", "charges", "payment-result"];
           const currentIdx = stepNames.indexOf(step);
           const isActive = i <= currentIdx;
           return (
@@ -485,7 +554,7 @@ function Bbps2DashboardContent({ onBack }: Props) {
               <span className={`px-2 py-0.5 rounded-full ${isActive ? "bg-green-100 text-green-800 font-medium" : "bg-muted"}`}>
                 {s}
               </span>
-              {i < 4 && <ChevronRight className="h-3 w-3" />}
+              {i < stepNames.length - 1 && <ChevronRight className="h-3 w-3" />}
             </span>
           );
         })}
@@ -555,42 +624,33 @@ function Bbps2DashboardContent({ onBack }: Props) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">
-                  Credit Card Number <span className="text-red-500">*</span>
+                  Last 4 Digits of Card <span className="text-red-500">*</span>
                 </label>
                 <Input
-                  placeholder="Enter 16-digit card number"
+                  placeholder="e.g. 5008"
                   value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, "").slice(0, 16))}
-                  maxLength={16}
+                  onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  maxLength={4}
                 />
-                <p className="text-[11px] text-muted-foreground">16 digits, no spaces</p>
+                <p className="text-[11px] text-muted-foreground">Last 4 digits of credit card number</p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">
-                  Customer Mobile <span className="text-red-500">*</span>
+                  Registered Mobile Number <span className="text-red-500">*</span>
                 </label>
                 <Input
-                  placeholder="10-digit mobile number"
+                  placeholder="10-digit registered mobile"
                   value={customerNumber}
                   onChange={(e) => setCustomerNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
                   maxLength={10}
                 />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Pincode</label>
-                <Input
-                  placeholder="414002"
-                  value={pincode}
-                  onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  maxLength={6}
-                />
-                <p className="text-[11px] text-muted-foreground">Customer&apos;s pincode (default: 414002)</p>
+                <p className="text-[11px] text-muted-foreground">Mobile number linked with the credit card</p>
               </div>
             </div>
 
             <Button
               onClick={handleFetchBill}
-              disabled={cardNumber.length < 15 || customerNumber.length < 10}
+              disabled={cardNumber.length < 4 || customerNumber.length < 10}
               className="bg-green-700 hover:bg-green-800 text-white"
             >
               <Search className="h-4 w-4" />
@@ -624,8 +684,14 @@ function Bbps2DashboardContent({ onBack }: Props) {
               {billData.data?.bill_date && (
                 <p className="text-sm"><span className="font-medium">Bill Date:</span> {billData.data.bill_date}</p>
               )}
-              {billData.data?.due_date && (
-                <p className="text-sm"><span className="font-medium">Due Date:</span> {billData.data.due_date}</p>
+              {(billData.data?.bill_due_date || billData.data?.due_date) && (
+                <p className="text-sm"><span className="font-medium">Due Date:</span> {billData.data.bill_due_date || billData.data.due_date}</p>
+              )}
+              {billData.data?.["Minimum Amount Due"] && (
+                <p className="text-sm"><span className="font-medium">Minimum Amount Due:</span> ₹{Number(billData.data["Minimum Amount Due"]).toLocaleString("en-IN")}</p>
+              )}
+              {billData.data?.["Maximum Permissible Amount"] && (
+                <p className="text-sm"><span className="font-medium">Max Permissible:</span> ₹{Number(billData.data["Maximum Permissible Amount"]).toLocaleString("en-IN")}</p>
               )}
               {billFetchRef && (
                 <p className="text-xs text-muted-foreground">Order ID (bill_fetch_ref): {billFetchRef}</p>
@@ -635,27 +701,55 @@ function Bbps2DashboardContent({ onBack }: Props) {
               )}
             </div>
 
-            <div className="border-t pt-4 space-y-4">
-              <h3 className="text-sm font-semibold">Enter Retailer ID to check charges</h3>
-              <div className="space-y-1.5 max-w-sm">
-                <label className="text-sm font-medium">
-                  Retailer ID <span className="text-red-500">*</span>
+            <div className="border-t pt-4 space-y-3">
+              <h3 className="text-sm font-semibold">Payment Amount</h3>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="amount-type"
+                    checked={!useCustomAmount}
+                    onChange={() => setUseCustomAmount(false)}
+                    className="accent-green-700"
+                  />
+                  <span className="text-sm">Full Amount (₹{Number(billData.data?.amount || 0).toLocaleString("en-IN")})</span>
                 </label>
-                <Input
-                  placeholder="Enter retailer ID"
-                  value={retailerId}
-                  onChange={(e) => setRetailerId(e.target.value)}
-                />
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="amount-type"
+                    checked={useCustomAmount}
+                    onChange={() => setUseCustomAmount(true)}
+                    className="accent-green-700"
+                  />
+                  <span className="text-sm">Custom Amount</span>
+                </label>
               </div>
+              {useCustomAmount && (
+                <div className="space-y-1.5 max-w-xs">
+                  <Input
+                    type="number"
+                    placeholder="Enter amount in ₹"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                    min={1}
+                  />
+                  {billData.data?.["Minimum Amount Due"] && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Min: ₹{Number(billData.data["Minimum Amount Due"]).toLocaleString("en-IN")} · Max: ₹{Number(billData.data["Maximum Permissible Amount"] || billData.data.amount || 0).toLocaleString("en-IN")}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <Button
-              onClick={handleCheckCharges}
-              disabled={!retailerId.trim() || !billData.data?.amount}
+              onClick={() => handleCheckCharges()}
+              disabled={useCustomAmount ? !customAmount.trim() || Number(customAmount) <= 0 : !billData.data?.amount}
               className="bg-green-700 hover:bg-green-800 text-white"
             >
               <Wallet className="h-4 w-4" />
-              Check Charges
+              Check Charges &amp; Proceed
             </Button>
           </CardContent>
         </Card>
@@ -707,7 +801,7 @@ function Bbps2DashboardContent({ onBack }: Props) {
             </div>
 
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              <strong>Confirm:</strong> Clicking &quot;Pay Now&quot; will debit ₹{((chargesData.amount || billData.data?.amount || 0) + (chargesData.charges?.total_charge || 0)).toLocaleString("en-IN")} from the retailer wallet for {selectedBiller?.product_name}.
+              <strong>Confirm:</strong> Clicking &quot;Pay Now&quot; will debit ₹{((chargesData.amount || billData.data?.amount || 0) + (chargesData.charges?.total_charge || 0)).toLocaleString("en-IN")} from your partner wallet for {selectedBiller?.product_name}.
             </div>
 
             <div className="flex gap-3">
@@ -772,6 +866,12 @@ function Bbps2DashboardContent({ onBack }: Props) {
                   {paymentResult.error?.code && getErrorHint(paymentResult.error.code) && (
                     <p className="text-sm text-red-700 mt-1">{getErrorHint(paymentResult.error.code)}</p>
                   )}
+                  {paymentResult.wallet_balance != null && (
+                    <p className="text-sm text-red-700">Wallet Balance: ₹{paymentResult.wallet_balance.toLocaleString("en-IN")}</p>
+                  )}
+                  {paymentResult.required_amount != null && (
+                    <p className="text-sm text-red-700">Required Amount: ₹{paymentResult.required_amount.toLocaleString("en-IN")}</p>
+                  )}
                   {paymentResult.request_id && (
                     <p className="text-xs text-muted-foreground">Request ID: {paymentResult.request_id}</p>
                   )}
@@ -779,10 +879,152 @@ function Bbps2DashboardContent({ onBack }: Props) {
               )}
             </div>
 
-            <Button variant="outline" size="sm" onClick={resetFlow}>
-              <CreditCard className="h-4 w-4" />
-              New Payment
+            <div className="flex gap-3 flex-wrap">
+              {(paymentResult.request_id || paymentResult.order_id) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openStatusCheck(paymentResult.order_id, paymentResult.request_id)}
+                >
+                  <Search className="h-4 w-4" />
+                  Check Status
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={resetFlow}>
+                <CreditCard className="h-4 w-4" />
+                New Payment
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step: Check Status */}
+      {!loading && step === "check-status" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Transaction Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Order ID</label>
+                <Input
+                  placeholder="e.g. P2N_PAY_9876543210"
+                  value={statusOrderId}
+                  onChange={(e) => setStatusOrderId(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Request ID</label>
+                <Input
+                  placeholder="e.g. SDS1719720000002"
+                  value={statusRequestId}
+                  onChange={(e) => setStatusRequestId(e.target.value)}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Provide either Order ID or Request ID (at least one required).
+            </p>
+            <Button
+              onClick={() => handleCheckStatus()}
+              disabled={!statusOrderId.trim() && !statusRequestId.trim()}
+              className="bg-green-700 hover:bg-green-800 text-white"
+            >
+              <Search className="h-4 w-4" />
+              Check Status
             </Button>
+
+            {statusResult && (
+              <div className={`rounded-lg border p-5 space-y-3 ${
+                statusResult.status === "SUCCESS" ? "border-green-200 bg-green-50" :
+                statusResult.status === "PENDING" ? "border-amber-200 bg-amber-50" :
+                statusResult.status === "REFUNDED" ? "border-blue-200 bg-blue-50" :
+                "border-red-200 bg-red-50"
+              }`}>
+                {statusResult.success ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-2">
+                      {statusResult.status === "SUCCESS" && <BadgeCheck className="h-6 w-6 text-green-600" />}
+                      {statusResult.status === "PENDING" && <Loader2 className="h-6 w-6 text-amber-600" />}
+                      {statusResult.status === "FAILED" && <XCircle className="h-6 w-6 text-red-600" />}
+                      {statusResult.status === "REFUNDED" && <ArrowLeftRight className="h-6 w-6 text-blue-600" />}
+                      <span className={`text-lg font-semibold ${
+                        statusResult.status === "SUCCESS" ? "text-green-800" :
+                        statusResult.status === "PENDING" ? "text-amber-800" :
+                        statusResult.status === "REFUNDED" ? "text-blue-800" :
+                        "text-red-800"
+                      }`}>
+                        {statusResult.status}
+                      </span>
+                    </div>
+                    {statusResult.order_id && (
+                      <p className="text-sm"><span className="font-medium">Order ID:</span> {statusResult.order_id}</p>
+                    )}
+                    {statusResult.operator_reference && (
+                      <p className="text-sm"><span className="font-medium">Operator Reference:</span> {statusResult.operator_reference}</p>
+                    )}
+                    {statusResult.amount != null && (
+                      <p className="text-sm"><span className="font-medium">Amount:</span> ₹{Number(statusResult.amount).toLocaleString("en-IN")}</p>
+                    )}
+                    {statusResult.charge != null && (
+                      <p className="text-sm"><span className="font-medium">Charge:</span> ₹{Number(statusResult.charge).toLocaleString("en-IN")}</p>
+                    )}
+                    {statusResult.created_at && (
+                      <p className="text-sm"><span className="font-medium">Created:</span> {new Date(statusResult.created_at).toLocaleString()}</p>
+                    )}
+                    {statusResult.updated_at && (
+                      <p className="text-sm"><span className="font-medium">Updated:</span> {new Date(statusResult.updated_at).toLocaleString()}</p>
+                    )}
+                    {statusResult.request_id && (
+                      <p className="text-xs text-muted-foreground">Request ID: {statusResult.request_id}</p>
+                    )}
+                    {statusResult.status === "PENDING" && (
+                      <div className="mt-3 rounded-lg border border-amber-300 bg-amber-100 p-3 text-sm text-amber-900">
+                        Transaction is still being processed. Wait 30-60 seconds and check again. <strong>Do NOT retry the payment.</strong>
+                      </div>
+                    )}
+                    {statusResult.status === "FAILED" && (
+                      <div className="mt-3 rounded-lg border border-red-300 bg-red-100 p-3 text-sm text-red-900">
+                        Payment failed. Wallet amount has been auto-refunded. You may retry the payment flow.
+                      </div>
+                    )}
+                    {statusResult.status === "REFUNDED" && (
+                      <div className="mt-3 rounded-lg border border-blue-300 bg-blue-100 p-3 text-sm text-blue-900">
+                        Payment was refunded. Wallet has been credited back.
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm font-medium text-red-800">
+                    {statusResult.error?.code ? `[${statusResult.error.code}] ` : ""}
+                    {statusResult.error?.message || "Could not retrieve status"}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {statusResult?.status === "PENDING" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleCheckStatus()}
+              >
+                <Search className="h-4 w-4" />
+                Recheck Status
+              </Button>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" size="sm" onClick={resetFlow}>
+                <CreditCard className="h-4 w-4" />
+                New Payment
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

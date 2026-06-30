@@ -42,6 +42,8 @@ import type {
   Pay2NewFetchBillResponse,
   Pay2NewPayBillRequest,
   Pay2NewPayBillResponse,
+  Pay2NewBillStatusRequest,
+  Pay2NewBillStatusResponse,
 } from "./types";
 
 const PROXY = "/api/proxy";
@@ -493,5 +495,19 @@ export async function payPay2NewBill(body: Pay2NewPayBillRequest): Promise<Pay2N
     return (await res.json()) as Pay2NewPayBillResponse;
   } catch {
     return { success: false, error: { message: `Payment failed (HTTP ${res.status}).` } };
+  }
+}
+
+export async function checkPay2NewBillStatus(body: Pay2NewBillStatusRequest): Promise<Pay2NewBillStatusResponse> {
+  const res = await fetch(`${PAY2NEW_PROXY}/bill/status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as Pay2NewBillStatusResponse;
+  } catch {
+    return { success: false, error: { message: `Status check failed (HTTP ${res.status}).` } };
   }
 }

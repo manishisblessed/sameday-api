@@ -573,7 +573,6 @@ export interface Pay2NewBillersResponse {
 }
 
 export interface Pay2NewChargesRequest {
-  retailer_id: string;
   amount: number;
 }
 
@@ -608,6 +607,10 @@ export interface Pay2NewBillData {
   amount?: number;
   bill_date?: string;
   due_date?: string;
+  bill_due_date?: string;
+  bill_number?: string;
+  "Minimum Amount Due"?: string;
+  "Maximum Permissible Amount"?: string;
   [key: string]: unknown;
 }
 
@@ -620,7 +623,6 @@ export interface Pay2NewFetchBillResponse {
 }
 
 export interface Pay2NewPayBillRequest {
-  retailer_id: string;
   number: string;
   amount: number;
   product_code: string;
@@ -640,6 +642,29 @@ export interface Pay2NewPayBillResponse {
   operator_reference?: string;
   amount?: number;
   charge?: number;
+  request_id?: string;
+  wallet_balance?: number;
+  bill_amount?: number;
+  required_amount?: number;
+  refunded?: boolean;
+  refund_amount?: number;
+  error?: { code?: string; message?: string };
+}
+
+export interface Pay2NewBillStatusRequest {
+  order_id?: string;
+  request_id?: string;
+}
+
+export interface Pay2NewBillStatusResponse {
+  success: boolean;
+  order_id?: string | null;
+  status?: "SUCCESS" | "PENDING" | "FAILED" | "REFUNDED";
+  amount?: number;
+  charge?: number;
+  operator_reference?: string | null;
+  created_at?: string;
+  updated_at?: string;
   request_id?: string;
   error?: { code?: string; message?: string };
 }
