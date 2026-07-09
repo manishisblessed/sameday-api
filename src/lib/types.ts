@@ -303,10 +303,13 @@ export interface ShadvalAccountsResponse {
 
 export interface ShadvalChargesResponse {
   success: boolean;
-  charges?: number;
-  total_debit?: number;
   amount?: number;
   mode?: string;
+  scheme_name?: string;
+  charges?: number;
+  gst_amount?: number;
+  total_charge?: number;
+  total_debit?: number;
   error?: { code?: string; message?: string };
 }
 

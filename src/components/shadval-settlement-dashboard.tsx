@@ -268,7 +268,14 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
   const [lastReferenceId, setLastReferenceId] = useState<string | null>(null);
 
   // Charges
-  const [chargesInfo, setChargesInfo] = useState<string | null>(null);
+  const [chargesInfo, setChargesInfo] = useState<{
+    scheme_name?: string;
+    charges?: number;
+    gst_amount?: number;
+    total_charge?: number;
+    total_debit?: number;
+    raw?: string;
+  } | null>(null);
 
   // Transactions
   const [transactions, setTransactions] = useState<ShadvalTransaction[]>([]);
@@ -382,12 +389,18 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
 
   const onCheckCharges = async () => {
     const amt = Number(transferAmount);
-    if (!amt || amt <= 0) { setChargesInfo("Enter a valid amount first."); return; }
+    if (!amt || amt <= 0) { setChargesInfo({ raw: "Enter a valid amount first." }); return; }
     const res = await fetchShadvalCharges(amt, transferMode);
     if (res.success) {
-      setChargesInfo(`Charges: ₹${res.charges ?? 0} · Total debit: ₹${res.total_debit ?? amt}`);
+      setChargesInfo({
+        scheme_name: res.scheme_name,
+        charges: res.charges,
+        gst_amount: res.gst_amount,
+        total_charge: res.total_charge,
+        total_debit: res.total_debit,
+      });
     } else {
-      setChargesInfo(res.error?.message ?? "Could not get charges");
+      setChargesInfo({ raw: res.error?.message ?? "Could not get charges" });
     }
   };
 
@@ -825,8 +838,22 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
                     </div>
 
                     {chargesInfo && (
-                      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">
-                        {chargesInfo}
+                      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                        {chargesInfo.raw ? (
+                          <p>{chargesInfo.raw}</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {chargesInfo.scheme_name && (
+                              <p className="text-xs font-semibold text-sky-700">Scheme: {chargesInfo.scheme_name}</p>
+                            )}
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                              <span>Charges: <strong>₹{chargesInfo.charges ?? 0}</strong></span>
+                              <span>GST (18%): <strong>₹{chargesInfo.gst_amount ?? 0}</strong></span>
+                              <span>Total charge: <strong>₹{chargesInfo.total_charge ?? 0}</strong></span>
+                              <span className="font-semibold">Total debit: ₹{chargesInfo.total_debit ?? 0}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
