@@ -1,29 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isGateEnabled, isValidGateToken, gateCookieName } from "@/lib/access-gate";
 
 /**
- * POST /api/bbps/check-token — verify that a browser-stored token is still valid.
- * Used on mount so the UI knows whether to show the password gate.
- * If BBPS_PASSWORD is not set, password gate is disabled (always valid).
+ * POST /api/bbps/check-token — tell the UI whether the BBPS gate is unlocked.
+ * Source of truth is the httpOnly cookie set by /api/bbps/unlock, so the UI's
+ * lock state always matches what the API will actually accept.
+ * If BBPS_PASSWORD is not set, the gate is disabled (always valid).
  */
 export async function POST(req: NextRequest) {
-  const secret = process.env.BBPS_PASSWORD?.trim();
-
-  if (!secret) {
+  if (!isGateEnabled("bbps")) {
     return NextResponse.json({ valid: true, passwordDisabled: true });
   }
 
-  let body: { token?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ valid: false }, { status: 400 });
-  }
-
-  const { createHash } = await import("node:crypto");
-  const today = new Date().toISOString().slice(0, 10);
-  const expected = createHash("sha256").update(`${secret}:bbps:${today}`).digest("hex");
-
-  const noPasswordToken = createHash("sha256").update(`no-bbps-password:${today}`).digest("hex");
-
-  return NextResponse.json({ valid: body.token === expected || body.token === noPasswordToken });
+  const token = req.cookies.get(gateCookieName("bbps"))?.value;
+  return NextResponse.json({ valid: isValidGateToken("bbps", token) });
 }
