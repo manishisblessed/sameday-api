@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiFetch } from "@/lib/api";
 import { safeJsonResponse } from "@/lib/api-status";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const referenceId = searchParams.get("reference_id");
