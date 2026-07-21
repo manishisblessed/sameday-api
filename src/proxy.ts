@@ -16,10 +16,12 @@ import {
 
 /** Which gate (if any) protects a given API path. */
 function scopeForPath(pathname: string): GateScope | null {
-  // BBPS-1 bill payments + BBPS-2 (Pay2New) credit-card payments (via the upstream proxy).
+  // BBPS-1 bill payments + BBPS-2 (Pay2New) credit-card payments (via the upstream proxy)
+  // + Credit Card-2 (RechargeKit) direct CC payments (dedicated routes).
   if (
     pathname.startsWith("/api/proxy/api/partner/bbps") ||
-    pathname.startsWith("/api/proxy/api/partner/pay2new")
+    pathname.startsWith("/api/proxy/api/partner/pay2new") ||
+    pathname.startsWith("/api/rechargekit")
   ) {
     return "bbps";
   }

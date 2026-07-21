@@ -45,6 +45,7 @@ import { SettlementPayoutDashboard } from "@/components/settlement-payout-dashbo
 import { ShadvalSettlementDashboard } from "@/components/shadval-settlement-dashboard";
 import { BbpsDashboard } from "@/components/bbps-dashboard";
 import { Bbps2CreditCardDashboard } from "@/components/bbps2-credit-card-dashboard";
+import { RechargeKitCreditCardDashboard } from "@/components/rechargekit-cc-dashboard";
 
 const PIE_COLORS = ["#16a34a", "#ea580c", "#2563eb", "#9333ea", "#dc2626", "#ca8a04"];
 
@@ -52,6 +53,7 @@ type ApiKey =
   | "pos-transaction-api"
   | "bbps"
   | "bbps2-credit-card"
+  | "rechargekit-cc"
   | "settlement"
   | "payout-2-shadval"
   | "dmt"
@@ -105,6 +107,18 @@ const API_OPTIONS: ApiOption[] = [
       orb: "bg-indigo-400/35",
       chip: "bg-indigo-500/[0.13] text-indigo-900 ring-1 ring-indigo-500/25 shadow-inner shadow-indigo-900/5",
       corner: "from-indigo-500/20 to-purple-500/5",
+    },
+    hideOnHome: true,
+  },
+  {
+    key: "rechargekit-cc",
+    label: "Credit Card-2 (RechargeKit)",
+    description: "Direct credit card payments via the RechargeKit CC-2 integration.",
+    icon: CreditCard,
+    accent: {
+      orb: "bg-teal-400/35",
+      chip: "bg-teal-500/[0.13] text-teal-900 ring-1 ring-teal-500/25 shadow-inner shadow-teal-900/5",
+      corner: "from-teal-500/20 to-emerald-500/5",
     },
     hideOnHome: true,
   },
@@ -402,6 +416,10 @@ export default function DashboardPage() {
 
   if (selectedApi === "bbps2-credit-card") {
     return <Bbps2CreditCardDashboard onBack={resetSelection} />;
+  }
+
+  if (selectedApi === "rechargekit-cc") {
+    return <RechargeKitCreditCardDashboard onBack={resetSelection} />;
   }
 
   const selectedApiOption = API_OPTIONS.find((option) => option.key === selectedApi);

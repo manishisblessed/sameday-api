@@ -676,3 +676,89 @@ export interface Pay2NewBillStatusResponse {
   request_id?: string;
   error?: { code?: string; message?: string };
 }
+
+/** Credit Card-2 (RechargeKit) Direct CC Payment API Types */
+
+export type RechargeKitStatus = "SUCCESS" | "PENDING" | "FAILED" | "REFUNDED";
+
+export interface RechargeKitOperator {
+  operator_id: string;
+  operator_name: string;
+  operator_code: string;
+  /** Some upstream lists include the card IFSC directly; used to auto-fill when present. */
+  ifsc?: string;
+}
+
+export interface RechargeKitOperatorsResponse {
+  success: boolean;
+  operators?: RechargeKitOperator[];
+  count?: number;
+  /** Present when served from the server-side cache. */
+  cached?: boolean;
+  cached_at?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface RechargeKitChargesRequest {
+  amount: number;
+}
+
+export interface RechargeKitCharges {
+  base_charge: number;
+  gst_percent: number;
+  gst_amount: number;
+  total_charge: number;
+}
+
+export interface RechargeKitChargesResponse {
+  success: boolean;
+  amount?: number;
+  scheme_name?: string;
+  charges?: RechargeKitCharges;
+  error?: { code?: string; message?: string };
+}
+
+export interface RechargeKitPayRequest {
+  mobile_no: string;
+  account_no: string;
+  ifsc: string;
+  bank_name: string;
+  beneficiary_name: string;
+  amount: number;
+  operator_code: string;
+}
+
+export interface RechargeKitPayResponse {
+  success: boolean;
+  status?: RechargeKitStatus;
+  txn_id?: string | null;
+  operator_reference?: string | null;
+  amount?: number;
+  charge?: number;
+  request_id?: string;
+  message?: string;
+  wallet_balance?: number;
+  bill_amount?: number;
+  required_amount?: number;
+  refunded?: boolean;
+  refund_amount?: number;
+  error?: { code?: string; message?: string };
+}
+
+export interface RechargeKitStatusRequest {
+  txn_id?: string;
+  request_id?: string;
+}
+
+export interface RechargeKitStatusResponse {
+  success: boolean;
+  txn_id?: string | null;
+  status?: RechargeKitStatus;
+  amount?: number;
+  charge?: number;
+  operator_reference?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  request_id?: string;
+  error?: { code?: string; message?: string };
+}

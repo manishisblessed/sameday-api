@@ -44,6 +44,13 @@ import type {
   Pay2NewPayBillResponse,
   Pay2NewBillStatusRequest,
   Pay2NewBillStatusResponse,
+  RechargeKitOperatorsResponse,
+  RechargeKitChargesRequest,
+  RechargeKitChargesResponse,
+  RechargeKitPayRequest,
+  RechargeKitPayResponse,
+  RechargeKitStatusRequest,
+  RechargeKitStatusResponse,
 } from "./types";
 
 const PROXY = "/api/proxy";
@@ -533,5 +540,108 @@ export async function checkPay2NewBillStatus(body: Pay2NewBillStatusRequest): Pr
     return (await res.json()) as Pay2NewBillStatusResponse;
   } catch {
     return { success: false, error: { message: `Status check failed (HTTP ${res.status}).` } };
+  }
+}
+
+// ─── Credit Card-2 (RechargeKit) Direct CC Payment API ───────────────────────
+
+const RECHARGEKIT = "/api/rechargekit";
+
+const RK_OPERATORS_CACHE_KEY = "rechargekit_operators_cache_v1";
+const RK_OPERATORS_TTL_MS = 24 * 60 * 60 * 1000; // 24h client-side cache
+
+/**
+ * Fetch CC operators. Server caches the upstream list for 24h; the client
+ * additionally caches in localStorage so we don't refetch on every mount.
+ * Pass `refresh: true` to bypass both caches.
+ */
+export async function fetchRechargeKitOperators(
+  opts: { refresh?: boolean } = {}
+): Promise<RechargeKitOperatorsResponse> {
+  if (!opts.refresh && typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem(RK_OPERATORS_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { at: number; data: RechargeKitOperatorsResponse };
+        if (Date.now() - parsed.at < RK_OPERATORS_TTL_MS && parsed.data?.success) {
+          return { ...parsed.data, cached: true };
+        }
+      }
+    } catch {
+      // Corrupt cache — ignore and fetch fresh.
+    }
+  }
+
+  const url = `${RECHARGEKIT}/operators${opts.refresh ? "?refresh=true" : ""}`;
+  const res = await fetch(url, { cache: "no-store" });
+  let data: RechargeKitOperatorsResponse;
+  try {
+    data = (await res.json()) as RechargeKitOperatorsResponse;
+  } catch {
+    return { success: false, error: { message: `Operators unavailable (HTTP ${res.status}).` } };
+  }
+
+  if (data.success && Array.isArray(data.operators) && typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(
+        RK_OPERATORS_CACHE_KEY,
+        JSON.stringify({ at: Date.now(), data })
+      );
+    } catch {
+      // Storage full / disabled — non-fatal.
+    }
+  }
+  return data;
+}
+
+export async function fetchRechargeKitCharges(
+  body: RechargeKitChargesRequest
+): Promise<RechargeKitChargesResponse> {
+  const res = await fetch(`${RECHARGEKIT}/charges`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as RechargeKitChargesResponse;
+  } catch {
+    return { success: false, error: { message: `Charges unavailable (HTTP ${res.status}).` } };
+  }
+}
+
+/**
+ * Process a CC payment. On timeout/network error this throws — callers MUST
+ * fall back to `checkRechargeKitStatus({ request_id })` and must NOT retry Pay.
+ */
+export async function payRechargeKit(
+  body: RechargeKitPayRequest
+): Promise<RechargeKitPayResponse> {
+  const res = await fetch(`${RECHARGEKIT}/pay`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as RechargeKitPayResponse;
+  } catch {
+    return { success: false, error: { message: `Payment response unreadable (HTTP ${res.status}).` } };
+  }
+}
+
+export async function checkRechargeKitStatus(
+  body: RechargeKitStatusRequest
+): Promise<RechargeKitStatusResponse> {
+  const res = await fetch(`${RECHARGEKIT}/status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as RechargeKitStatusResponse;
+  } catch {
+    return { success: false, error: { message: `Status unavailable (HTTP ${res.status}).` } };
   }
 }

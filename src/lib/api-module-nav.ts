@@ -44,6 +44,8 @@ export function moduleContextTitle(apiKey: string | null): string {
     case "bbps":
     case "bbps2-credit-card":
       return "BBPS";
+    case "rechargekit-cc":
+      return "Credit Card-2 · RechargeKit";
     case "dmt":
       return "DMT";
     case "aeps":
@@ -84,6 +86,15 @@ export function getModuleNavLinks(apiKey: string | null): ModuleNavItem[] {
     return [
       modules,
       { href: "/?api=bbps", label: "BBPS-1", icon: Building2 },
+      { href: "/?api=bbps2-credit-card", label: "BBPS-2 Credit Card", icon: CreditCard },
+      { href: "/?api=rechargekit-cc", label: "Credit Card-2 (RechargeKit)", icon: CreditCard },
+    ];
+  }
+
+  if (apiKey === "rechargekit-cc") {
+    return [
+      modules,
+      { href: "/?api=rechargekit-cc", label: "Credit Card-2 (RechargeKit)", icon: CreditCard },
       { href: "/?api=bbps2-credit-card", label: "BBPS-2 Credit Card", icon: CreditCard },
     ];
   }
