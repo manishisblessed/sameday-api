@@ -37,6 +37,7 @@ import {
   fetchShadvalBalance,
   fetchShadvalAccounts,
   addShadvalAccount,
+  addTrustedAccount,
   deleteShadvalAccount,
   fetchShadvalCharges,
   initiateShadvalTransfer,
@@ -254,6 +255,7 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
   const [newContactName, setNewContactName] = useState("");
   const [newContactEmail, setNewContactEmail] = useState("");
   const [newContactMobile, setNewContactMobile] = useState("");
+  const [skipVerification, setSkipVerification] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [addMsg, setAddMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -342,23 +344,44 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
 
   const onAddAccount = async () => {
     setAddMsg(null);
-    if (!newContactEmail.trim()) {
-      setAddMsg({ type: "error", text: "Contact email is required for transfers." });
-      return;
+    if (skipVerification) {
+      if (!newContactMobile.trim() || !/^\d{10}$/.test(newContactMobile.trim())) {
+        setAddMsg({ type: "error", text: "A valid 10-digit mobile number is required for trusted (skip verification) accounts." });
+        return;
+      }
+    } else {
+      if (!newContactEmail.trim()) {
+        setAddMsg({ type: "error", text: "Contact email is required for transfers." });
+        return;
+      }
     }
     setAddLoading(true);
     try {
-      const res = await addShadvalAccount({
-        account_number: newAcctNumber.trim(),
-        ifsc_code: newIfsc.trim().toUpperCase(),
-        account_holder_name: newHolderName.trim(),
-        contact_name: newContactName.trim() || undefined,
-        contact_email: newContactEmail.trim(),
-        contact_mobile: newContactMobile.trim() || undefined,
-      });
+      const res = skipVerification
+        ? await addTrustedAccount({
+            account_number: newAcctNumber.trim(),
+            ifsc_code: newIfsc.trim().toUpperCase(),
+            account_holder_name: newHolderName.trim(),
+            contact_name: newContactName.trim() || undefined,
+            contact_email: newContactEmail.trim() || undefined,
+            contact_mobile: newContactMobile.trim(),
+          })
+        : await addShadvalAccount({
+            account_number: newAcctNumber.trim(),
+            ifsc_code: newIfsc.trim().toUpperCase(),
+            account_holder_name: newHolderName.trim(),
+            contact_name: newContactName.trim() || undefined,
+            contact_email: newContactEmail.trim(),
+            contact_mobile: newContactMobile.trim() || undefined,
+          });
       if (res.success) {
-        const verifiedStr = res.verified ? `Verified as: ${res.verified_name || "—"}` : `Status: ${res.verification_status || "PENDING"}`;
-        setAddMsg({ type: "success", text: `Account added. ${verifiedStr}. Charge: ₹${res.charge_deducted ?? 4}` });
+        const verifiedStr = res.verified
+          ? `Verified as: ${res.verified_name || "—"}`
+          : res.skip_verification
+            ? "Added as trusted (unverified) — transfers at your own risk"
+            : `Status: ${res.verification_status || "PENDING"}`;
+        const chargeStr = `Charge: ₹${res.charge_deducted ?? (skipVerification ? 0 : 4)}`;
+        setAddMsg({ type: "success", text: `Account added. ${verifiedStr}. ${chargeStr}` });
         loadAccounts();
         loadBalance();
         setNewAcctNumber("");
@@ -367,6 +390,7 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
         setNewContactName("");
         setNewContactEmail("");
         setNewContactMobile("");
+        setSkipVerification(false);
       } else {
         setAddMsg({ type: "error", text: res.error?.message ?? res.message ?? "Failed to add account" });
       }
@@ -548,7 +572,7 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
 
         {/* Step Tabs */}
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 mb-6 flex flex-wrap items-center gap-2">
-          {stepLabel(1, "Accounts & Verify", <UserPlus className="h-4 w-4" />)}
+          {stepLabel(1, "Accounts", <UserPlus className="h-4 w-4" />)}
           {stepLabel(2, "Transfer", <Send className="h-4 w-4" />)}
           {stepLabel(3, "Status & History", <Search className="h-4 w-4" />)}
         </div>
@@ -565,11 +589,28 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 text-orange-700">
                         <UserPlus className="h-4 w-4" />
                       </div>
-                      <h2 className="text-base font-semibold text-slate-900">Add &amp; Verify Account</h2>
-                      <span className="ml-auto text-[11px] text-slate-500">₹4 verification charge</span>
+                      <h2 className="text-base font-semibold text-slate-900">{skipVerification ? "Add Trusted Account" : "Add & Verify Account"}</h2>
+                      <span className="ml-auto text-[11px] text-slate-500">{skipVerification ? "₹0 — no verification" : "₹4 verification charge"}</span>
                     </div>
 
                     <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={skipVerification}
+                            onChange={(e) => setSkipVerification(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-500/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500" />
+                        </label>
+                        <span className="text-sm font-medium text-slate-700">Skip verification (trusted account)</span>
+                      </div>
+                      {skipVerification && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-2.5 text-xs text-amber-800">
+                          <strong>Warning:</strong> Account details will NOT be confirmed with the bank. If account number or IFSC is wrong, funds may go to the wrong recipient. Only use for accounts you already trust.
+                        </div>
+                      )}
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-2">
                           {fieldLabel("Account number *")}
@@ -592,11 +633,11 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
                           <Input value={newContactName} onChange={(e) => setNewContactName(e.target.value)} placeholder="Optional" className={styledInput} />
                         </div>
                         <div className="space-y-2">
-                          {fieldLabel("Contact email *")}
-                          <Input type="email" value={newContactEmail} onChange={(e) => setNewContactEmail(e.target.value)} placeholder="Required for transfers" className={styledInput} />
+                          {fieldLabel(skipVerification ? "Contact email" : "Contact email *")}
+                          <Input type="email" value={newContactEmail} onChange={(e) => setNewContactEmail(e.target.value)} placeholder={skipVerification ? "Optional" : "Required for transfers"} className={styledInput} />
                         </div>
                         <div className="space-y-2">
-                          {fieldLabel("Contact mobile")}
+                          {fieldLabel(skipVerification ? "Contact mobile *" : "Contact mobile")}
                           <Input value={newContactMobile} onChange={(e) => setNewContactMobile(e.target.value)} placeholder="10 digits" className={styledInput} />
                         </div>
                       </div>
@@ -607,10 +648,10 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
                           size="lg"
                           className="gap-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 px-6 text-[15px] font-semibold text-white shadow-lg shadow-orange-500/25 transition-all hover:from-orange-700 hover:to-amber-700 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
                           onClick={onAddAccount}
-                          disabled={addLoading || !newAcctNumber.trim() || !newIfsc.trim() || !newHolderName.trim() || !newContactEmail.trim()}
+                          disabled={addLoading || !newAcctNumber.trim() || !newIfsc.trim() || !newHolderName.trim() || (skipVerification ? !newContactMobile.trim() : !newContactEmail.trim())}
                         >
                           {addLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
-                          Add &amp; Verify
+                          {skipVerification ? "Add Trusted Account" : "Add & Verify"}
                         </Button>
                       </div>
 
@@ -635,7 +676,7 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
                           <Landmark className="h-4 w-4" />
                         </div>
-                        <h2 className="text-base font-semibold text-slate-900">Verified Accounts</h2>
+                        <h2 className="text-base font-semibold text-slate-900">Accounts</h2>
                       </div>
                       <Button type="button" variant="ghost" size="sm" className="gap-1.5 rounded-lg text-orange-600 hover:bg-orange-50 hover:text-orange-700" onClick={() => loadAccounts()}>
                         <RefreshCw className={`h-3.5 w-3.5 ${accountsLoading ? "animate-spin" : ""}`} />
@@ -662,7 +703,7 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
                           {accounts.length === 0 && !accountsLoading && (
                             <TableRow>
                               <TableCell colSpan={5} className="py-8 text-center text-sm text-slate-500">
-                                No verified accounts yet. Add one above.
+                                No accounts yet. Add one above.
                               </TableCell>
                             </TableRow>
                           )}
@@ -673,9 +714,11 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
                               <TableCell className="text-sm font-medium">{acct.verified_name || acct.account_holder_name}</TableCell>
                               <TableCell>
                                 {acct.is_verified ? (
-                                  <Badge className="border-green-200 bg-green-50 text-green-800">Verified</Badge>
+                                  <Badge className="border-green-200 bg-green-50 text-green-800">{acct.verification_label || "Verified"}</Badge>
+                                ) : acct.verification_status === "SKIPPED" ? (
+                                  <Badge className="border-slate-200 bg-slate-50 text-slate-700">Trusted (unverified)</Badge>
                                 ) : (
-                                  <Badge className="border-amber-200 bg-amber-50 text-amber-900">Pending</Badge>
+                                  <Badge className="border-amber-200 bg-amber-50 text-amber-900">{acct.verification_label || "Pending"}</Badge>
                                 )}
                               </TableCell>
                               <TableCell>
@@ -751,7 +794,7 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
                   <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-orange-200">How it works</h3>
                   <ol className="space-y-3 text-sm leading-relaxed text-orange-100">
                     <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">1</span> Check wallet balance</li>
-                    <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">2</span> Add &amp; verify account (₹4 penny-drop)</li>
+                    <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">2</span> Add &amp; verify account (₹4) or add trusted account (₹0)</li>
                     <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">3</span> Choose account &amp; initiate transfer</li>
                     <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">4</span> Track status in real time</li>
                   </ol>
@@ -759,9 +802,11 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
 
                 {accounts.length > 0 && (
                   <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-sm">
-                    <p className="mb-1 text-xs font-medium text-slate-500">Verified accounts</p>
-                    <p className="text-3xl font-bold text-orange-700">{accounts.filter(a => a.is_verified).length}</p>
-                    <p className="text-xs text-slate-500">Ready for transfers</p>
+                    <p className="mb-1 text-xs font-medium text-slate-500">Usable accounts</p>
+                    <p className="text-3xl font-bold text-orange-700">{accounts.length}</p>
+                    <p className="text-xs text-slate-500">
+                      {accounts.filter(a => a.is_verified).length} verified, {accounts.filter(a => !a.is_verified).length} trusted
+                    </p>
                   </div>
                 )}
               </div>
@@ -782,20 +827,26 @@ export function ShadvalSettlementDashboard({ onBack }: Props) {
 
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      {fieldLabel("Select verified account *")}
+                      {fieldLabel("Select account *")}
                       <Select value={transferAccountId} onValueChange={(v) => setTransferAccountId(v ?? "")}>
                         <SelectTrigger className={styledInput}>
                           <SelectValue placeholder={accountsLoading ? "Loading accounts…" : "Select account"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {accounts.filter(a => a.is_verified).map((a) => (
+                          {accounts.map((a) => (
                             <SelectItem key={a.id} value={a.id}>
                               <span className="font-medium">{a.verified_name || a.account_holder_name}</span>
                               <span className="text-muted-foreground"> · {a.account_number} · {a.ifsc_code}</span>
+                              {!a.is_verified && <span className="ml-1 text-amber-600 text-xs">(unverified)</span>}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      {selectedTransferAccount && !selectedTransferAccount.is_verified && (
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                          This is an unverified (trusted) account. Transfer at your own risk — details have not been confirmed with the bank.
+                        </p>
+                      )}
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">

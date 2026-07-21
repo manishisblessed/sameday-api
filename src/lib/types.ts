@@ -269,6 +269,8 @@ export interface ShadvalAccount {
   contact_email?: string;
   contact_mobile?: string;
   is_verified: boolean;
+  verification_status?: "VERIFIED" | "NOT_VERIFIED" | "SKIPPED" | "PENDING" | "FAILED";
+  verification_label?: string;
   verified_name?: string;
   is_active?: boolean;
   created_at?: string;
@@ -281,15 +283,18 @@ export interface ShadvalAddAccountRequest {
   contact_name?: string;
   contact_email?: string;
   contact_mobile?: string;
+  skip_verification?: boolean;
 }
 
 export interface ShadvalAddAccountResponse {
   success: boolean;
   verified?: boolean;
   verification_status?: string;
+  verification_label?: string;
   verified_name?: string;
   account?: ShadvalAccount;
   charge_deducted?: number;
+  skip_verification?: boolean;
   message?: string;
   error?: { code?: string; message?: string };
 }

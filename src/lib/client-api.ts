@@ -274,6 +274,30 @@ export async function addShadvalAccount(body: ShadvalAddAccountRequest): Promise
   }
 }
 
+/**
+ * Add a trusted account WITHOUT penny-drop verification.
+ * Requires a valid 10-digit mobile number. The account is usable for transfers
+ * immediately but details are NOT confirmed with the bank — use at your own risk.
+ */
+export async function addTrustedAccount(
+  body: Omit<ShadvalAddAccountRequest, "skip_verification"> & { contact_mobile: string }
+): Promise<ShadvalAddAccountResponse> {
+  if (!/^\d{10}$/.test(body.contact_mobile)) {
+    return { success: false, error: { message: "contact_mobile must be a valid 10-digit number." } };
+  }
+  const res = await fetch(`${SHADVAL}/accounts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, skip_verification: true }),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as ShadvalAddAccountResponse;
+  } catch {
+    return { success: false, error: { message: `Add trusted account failed (HTTP ${res.status}).` } };
+  }
+}
+
 export async function deleteShadvalAccount(id: string): Promise<{ success: boolean; message?: string; error?: { message?: string } }> {
   const res = await fetch(`${SHADVAL}/accounts?id=${encodeURIComponent(id)}`, {
     method: "DELETE",
