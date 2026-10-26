@@ -206,13 +206,31 @@ export async function fetchPayoutBanks(query?: Record<string, string | boolean |
 }
 
 export async function verifyPayoutAccount(body: PayoutVerifyRequest): Promise<PayoutVerifyResponse> {
-  const res = await fetch(`${PAYOUT}/verify`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-  return (await res.json()) as PayoutVerifyResponse;
+  let res: Response;
+  try {
+    res = await fetch(`${PAYOUT}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch {
+    return { success: false, error: { message: "Verification service unreachable. You can still proceed to transfer." } };
+  }
+  try {
+    const data = (await res.json()) as PayoutVerifyResponse;
+    // Normalise raw upstream error messages that aren't user-friendly
+    if (!data.success) {
+      const raw = data.error?.message ?? data.message ?? "";
+      const isTechnical = /fetch failed|network|timeout|unavailable|internal|5\d\d/i.test(raw);
+      if (isTechnical || !raw) {
+        return { success: false, error: { message: "Account verification service is temporarily unavailable. You can still proceed to transfer." } };
+      }
+    }
+    return data;
+  } catch {
+    return { success: false, error: { message: `Verification unavailable (HTTP ${res.status}). You can still proceed to transfer.` } };
+  }
 }
 
 /** Initiate payout transfer (v3.0 — debits partner wallet, no merchant_id needed). */

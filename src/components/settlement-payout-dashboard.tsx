@@ -603,7 +603,9 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                         <div className={`animate-in fade-in slide-in-from-bottom-2 duration-300 rounded-xl border px-4 py-3.5 text-sm ${
                           holderName
                             ? "border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-900"
-                            : "border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900"
+                            : verifyMsg.toLowerCase().includes("unavailable") || verifyMsg.toLowerCase().includes("proceed")
+                              ? "border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50 text-sky-900"
+                              : "border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900"
                         }`}>
                           {holderName && (
                             <div className="mb-1 flex items-center gap-2">
@@ -612,7 +614,7 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                             </div>
                           )}
                           <p>{verifyMsg}</p>
-                          {holderName && (
+                          {(holderName || verifyMsg.toLowerCase().includes("proceed")) && (
                             <button
                               type="button"
                               onClick={() => setStep(2)}
