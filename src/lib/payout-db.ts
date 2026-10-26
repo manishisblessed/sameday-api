@@ -2,17 +2,18 @@
  * payout-db.ts
  *
  * SQLite persistence layer for Same Day Solution payout transactions.
- * Uses better-sqlite3 (synchronous, no connection pooling needed for SQLite).
+ * Uses the built-in `node:sqlite` module (available unflagged in Node ≥ 22.12).
+ * Zero native-compilation dependencies — deploys cleanly on any Node 22+ server.
  *
  * DB file: <project-root>/data/payout.db
  *
  * NOTE — Deployment:
- *   • Self-hosted / VPS: works as-is (persistent filesystem).
- *   • Vercel / serverless: replace with a cloud DB (e.g. Neon, PlanetScale, Turso).
- *     Swap out this module while keeping the same exported interface.
+ *   • Self-hosted / VPS (Node ≥ 22.12): works as-is.
+ *   • Vercel / serverless: replace with a cloud DB (Neon, Turso, PlanetScale)
+ *     and swap out this module while keeping the same exported interface.
  */
 
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -26,20 +27,20 @@ if (!fs.existsSync(DATA_DIR)) {
 
 const DB_PATH = path.join(DATA_DIR, "payout.db");
 
-let _db: Database.Database | null = null;
+let _db: DatabaseSync | null = null;
 
-function getDb(): Database.Database {
+function getDb(): DatabaseSync {
   if (!_db) {
-    _db = new Database(DB_PATH);
+    _db = new DatabaseSync(DB_PATH);
     // WAL mode: better concurrent read performance
-    _db.pragma("journal_mode = WAL");
-    _db.pragma("foreign_keys = ON");
+    _db.exec("PRAGMA journal_mode = WAL;");
+    _db.exec("PRAGMA foreign_keys = ON;");
     initSchema(_db);
   }
   return _db;
 }
 
-function initSchema(db: Database.Database): void {
+function initSchema(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS payout_transactions (
       transaction_id         TEXT PRIMARY KEY,
@@ -89,7 +90,7 @@ export interface PayoutRecord {
 /**
  * Insert a new payout transaction row.
  * Uses INSERT OR IGNORE so duplicate transaction_ids are silently skipped
- * (idempotency re-use is handled separately).
+ * (idempotency re-use is handled separately by findByIdempotencyKey).
  */
 export function insertTransaction(
   record: Omit<PayoutRecord, "updated_at"> & { updated_at?: string },
@@ -112,8 +113,8 @@ export function insertTransaction(
 
 /**
  * Update status + UTR + partner_trans_id for an existing row.
- * COALESCE keeps the current value when the new value is NULL (i.e. don't
- * overwrite a real UTR with null when the status is still PENDING).
+ * COALESCE keeps the current DB value when the new value is NULL
+ * (so a real UTR is never overwritten with null during PENDING polling).
  */
 export function updateTransactionStatus(
   transactionId: string,
@@ -162,7 +163,7 @@ export function findByTransactionId(id: string): PayoutRecord | null {
 
 /**
  * Return rows in PENDING or UNKNOWN status whose `created_at` is older than
- * `olderThanMinutes` minutes.  These are the candidates for the polling job.
+ * `olderThanMinutes` minutes — candidates for the background polling job.
  */
 export function findPendingTransactions(
   olderThanMinutes = 2,
@@ -179,7 +180,7 @@ export function findPendingTransactions(
       ORDER  BY created_at ASC
       LIMIT  50
     `)
-    .all({ cutoff }) as PayoutRecord[];
+    .all({ cutoff }) as unknown as PayoutRecord[];
 }
 
 /** Return the N most recent transactions (capped at 50). */
@@ -191,5 +192,5 @@ export function listTransactions(limit = 20): PayoutRecord[] {
       ORDER  BY created_at DESC
       LIMIT  ?
     `)
-    .all(Math.min(limit, 50)) as PayoutRecord[];
+    .all(Math.min(limit, 50)) as unknown as PayoutRecord[];
 }
