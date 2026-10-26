@@ -12,6 +12,7 @@ import {
   Lock,
   KeyRound,
   Wallet,
+  CheckCircle2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   fetchPayoutBalance,
-  verifyPayoutAccount,
   sdsInitiateTransfer,
   sdsGetPayoutStatus,
   sdsListPayouts,
@@ -311,9 +311,6 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
   const [bankName, setBankName] = useState("");
   const [holderName, setHolderName] = useState("");
   const [mobile, setMobile] = useState("");
-  const [verifyLoading, setVerifyLoading] = useState(false);
-  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
-
   // Auto-fill bank name when user types a valid IFSC
   function handleIfscChange(v: string) {
     const up = v.toUpperCase();
@@ -323,29 +320,6 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
       if (guess && !bankName) setBankName(guess);
     }
   }
-
-  const onVerify = async () => {
-    setVerifyMsg(null);
-    setVerifyLoading(true);
-    try {
-      const res = await verifyPayoutAccount({
-        accountNumber: acct.trim(),
-        ifscCode: ifsc.trim(),
-        bankName: bankName.trim() || undefined,
-      });
-      if (res.success && res.is_valid && res.account_holder_name) {
-        setHolderName(res.account_holder_name);
-        if (res.bank_name && !bankName) setBankName(res.bank_name);
-        setVerifyMsg(res.message ?? "Account verified.");
-      } else {
-        setVerifyMsg(res.error?.message ?? res.message ?? "Verification did not succeed.");
-      }
-    } catch (e) {
-      setVerifyMsg(e instanceof Error ? e.message : String(e));
-    } finally {
-      setVerifyLoading(false);
-    }
-  };
 
   // ── Step 2 — transfer fields ────────────────────────────────────────────────
   const [amount, setAmount] = useState("");
@@ -558,7 +532,7 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                         <Input
                           value={holderName}
                           onChange={(e) => setHolderName(e.target.value)}
-                          placeholder="Enter manually or use Verify"
+                          placeholder="e.g. Rahul Sharma"
                           className={inp}
                         />
                       </div>
@@ -576,55 +550,22 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                         />
                       </div>
 
-                      {/* Action row */}
-                      <div className="flex flex-wrap items-center gap-3 pt-2">
+                      {/* Proceed CTA */}
+                      <div className="pt-2">
                         <Button
                           type="button"
                           size="lg"
-                          className="gap-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 text-[15px] font-semibold text-white shadow-lg shadow-emerald-500/25 transition-all hover:from-emerald-700 hover:to-teal-700 hover:scale-[1.02] disabled:opacity-60"
-                          onClick={onVerify}
-                          disabled={verifyLoading || !acct.trim() || !ifsc.trim()}
-                        >
-                          {verifyLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
-                          Verify account
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="gap-2 rounded-xl text-violet-600 hover:bg-violet-50 hover:text-violet-700 transition-all"
+                          className="w-full gap-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-[15px] font-semibold text-white shadow-lg shadow-violet-500/25 transition-all hover:from-violet-700 hover:to-indigo-700 hover:scale-[1.01] disabled:opacity-60"
                           onClick={() => setStep(2)}
+                          disabled={!acct.trim() || !ifsc.trim() || !holderName.trim() || !bankName.trim() || !/^\d{10}$/.test(mobile.trim())}
                         >
                           Proceed to transfer
-                          <Send className="h-4 w-4" />
+                          <Send className="h-5 w-5" />
                         </Button>
+                        <p className="mt-2 text-center text-[11px] text-slate-400">
+                          All fields required · Bank name auto-fills from IFSC
+                        </p>
                       </div>
-
-                      {verifyMsg && (
-                        <div className={`animate-in fade-in slide-in-from-bottom-2 duration-300 rounded-xl border px-4 py-3.5 text-sm ${
-                          holderName
-                            ? "border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-900"
-                            : verifyMsg.toLowerCase().includes("unavailable") || verifyMsg.toLowerCase().includes("proceed")
-                              ? "border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50 text-sky-900"
-                              : "border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900"
-                        }`}>
-                          {holderName && (
-                            <div className="mb-1 flex items-center gap-2">
-                              <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                              <p className="font-bold text-emerald-800">{holderName}</p>
-                            </div>
-                          )}
-                          <p>{verifyMsg}</p>
-                          {(holderName || verifyMsg.toLowerCase().includes("proceed")) && (
-                            <button
-                              type="button"
-                              onClick={() => setStep(2)}
-                              className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors"
-                            >
-                              Proceed to transfer <Send className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -678,10 +619,13 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                   <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-violet-200">How it works</h3>
                   <ol className="space-y-3 text-sm leading-relaxed text-violet-100">
                     <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">1</span>Enter beneficiary account details</li>
-                    <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">2</span>Optionally verify account (free)</li>
-                    <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">3</span>Enter amount &amp; initiate IMPS/NEFT</li>
-                    <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">4</span>Track status in real time</li>
+                    <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">2</span>Enter amount &amp; initiate IMPS/NEFT</li>
+                    <li className="flex gap-2.5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold">3</span>Track status in real time</li>
                   </ol>
+                  <div className="mt-4 rounded-lg bg-white/10 px-3 py-2 text-[11px] text-violet-200 leading-relaxed">
+                    <CheckCircle2 className="mb-0.5 mr-1 inline h-3 w-3 text-emerald-300" />
+                    New beneficiaries are registered automatically on first transfer. A one-time ₹4.72 fee applies.
+                  </div>
                 </div>
               </div>
             </div>

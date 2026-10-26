@@ -152,24 +152,8 @@ export interface PayoutBanksResponse {
   error?: { code?: string; message?: string };
 }
 
-export interface PayoutVerifyRequest {
-  accountNumber: string;
-  ifscCode: string;
-  bankName?: string;
-  bankId?: number;
-}
-
-export interface PayoutVerifyResponse {
-  success: boolean;
-  is_valid?: boolean;
-  account_holder_name?: string;
-  bank_name?: string;
-  branch_name?: string;
-  verification_charges?: number;
-  message?: string;
-  reference_id?: string;
-  error?: { code?: string; message?: string };
-}
+// PayoutVerifyRequest and PayoutVerifyResponse removed — no verify endpoint in v3.0.
+// Beneficiary registration is handled automatically on the first transfer.
 
 export interface PayoutTransferRequest {
   accountNumber: string;

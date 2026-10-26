@@ -1,37 +1,41 @@
-import { NextRequest, NextResponse } from "next/server";
-import { apiFetch } from "@/lib/api";
-import { safeJsonResponse } from "@/lib/api-status";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json(
-      { success: false, error: { message: "Invalid JSON body" } },
-      { status: 400 },
-    );
-  }
+/**
+ * This endpoint does not exist in the Same Day Solution Payout API v3.0.
+ *
+ * There is NO separate account verification or beneficiary registration step.
+ * Beneficiary registration is handled internally on the first transfer to a
+ * new account. A one-time ₹4.72 verification charge appears in the transfer
+ * response (`verification_charge` field) for new beneficiaries.
+ */
+export async function GET() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: {
+        code: "ENDPOINT_REMOVED",
+        message:
+          "Account verification is not a separate step in v3.0. " +
+          "Beneficiary registration happens automatically on the first transfer. " +
+          "Use POST /api/payout/transfer directly.",
+      },
+    },
+    { status: 410 },
+  );
+}
 
-  try {
-    const result = await apiFetch("/api/partner/payout/verify", {
-      method: "POST",
-      body,
-    });
-
-    if (!result.ok) {
-      console.error(
-        `[payout/verify] Upstream returned ${result.status}:`,
-        JSON.stringify(result.data).slice(0, 300),
-      );
-    }
-
-    return safeJsonResponse(result);
-  } catch (err) {
-    console.error("[payout/verify] Request failed:", err);
-    return NextResponse.json(
-      { success: false, error: { message: "Verification request failed. Please try again." } },
-      { status: 502 },
-    );
-  }
+export async function POST() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: {
+        code: "ENDPOINT_REMOVED",
+        message:
+          "Account verification is not a separate step in v3.0. " +
+          "Beneficiary registration happens automatically on the first transfer. " +
+          "Use POST /api/payout/transfer directly.",
+      },
+    },
+    { status: 410 },
+  );
 }
