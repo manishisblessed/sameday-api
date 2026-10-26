@@ -356,6 +356,8 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
   const [transferMsg, setTransferMsg] = useState<string | null>(null);
   const [lastTxnId, setLastTxnId] = useState<string | null>(null);
   const [lastStatus, setLastStatus] = useState<string | null>(null);
+  const [lastVerificationCharge, setLastVerificationCharge] = useState<number | null>(null);
+  const [lastIsNewBeneficiary, setLastIsNewBeneficiary] = useState<boolean | null>(null);
 
   const onTransfer = async () => {
     setTransferMsg(null);
@@ -392,9 +394,11 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
       if (res.transaction_id) {
         setLastTxnId(res.transaction_id);
         setLastStatus(res.status ?? null);
+        setLastVerificationCharge(res.verification_charge ?? null);
+        setLastIsNewBeneficiary(res.is_new_beneficiary ?? null);
         setTransferMsg(
           res.message ??
-            `${res.status ?? "PROCESSING"} · ₹${res.total_debited ?? amt}`,
+            `${res.status ?? "PROCESSING"} · ₹${res.total_debited ?? amt} debited`,
         );
         loadList();
         loadBalance();
@@ -761,6 +765,28 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                           : "border-red-200 bg-gradient-to-r from-red-50 to-rose-50 text-red-800"
                       }`}>
                         <p className="font-medium">{transferMsg}</p>
+
+                        {/* Charge breakdown */}
+                        {lastTxnId && lastStatus !== "FAILED" && (
+                          <div className="mt-2 space-y-0.5 text-xs text-emerald-700">
+                            {lastVerificationCharge != null && lastVerificationCharge > 0 && (
+                              <p className="flex items-center gap-1">
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                Verification charge: ₹{lastVerificationCharge.toFixed(2)}
+                                {lastIsNewBeneficiary && (
+                                  <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-amber-700 font-medium">New beneficiary</span>
+                                )}
+                              </p>
+                            )}
+                            {lastVerificationCharge === 0 && lastIsNewBeneficiary === false && (
+                              <p className="flex items-center gap-1">
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                                No verification charge (repeat beneficiary)
+                              </p>
+                            )}
+                          </div>
+                        )}
+
                         {lastTxnId && (
                           <div className="mt-2 flex items-center gap-2">
                             <p className="font-mono text-xs bg-emerald-100/60 px-2 py-0.5 rounded-md text-emerald-600">
@@ -851,8 +877,29 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                           </div>
                           {statusResult.charges != null && (
                             <div className="flex items-center justify-between text-sky-800">
-                              <span>Charges</span>
+                              <span>Transfer charges</span>
                               <span>₹{statusResult.charges}</span>
+                            </div>
+                          )}
+                          {statusResult.verification_charge != null && (
+                            <div className="flex items-center justify-between text-sky-800">
+                              <span className="flex items-center gap-1">
+                                Verification charge
+                                {statusResult.is_new_beneficiary && (
+                                  <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">NEW</span>
+                                )}
+                              </span>
+                              <span>
+                                {statusResult.verification_charge > 0
+                                  ? `₹${statusResult.verification_charge.toFixed(2)}`
+                                  : <span className="text-emerald-600 font-medium">₹0 (repeat)</span>}
+                              </span>
+                            </div>
+                          )}
+                          {statusResult.total_debited != null && (
+                            <div className="flex items-center justify-between border-t border-sky-200 pt-2 font-semibold text-sky-900">
+                              <span>Total debited</span>
+                              <span>₹{statusResult.total_debited.toLocaleString("en-IN")}</span>
                             </div>
                           )}
                           {statusResult.utr && (

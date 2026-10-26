@@ -159,6 +159,8 @@ export const payoutService = {
           account_number: existing.account_number,
           account_holder_name: existing.account_holder_name,
           bank_name: existing.bank_name,
+          verification_charge: existing.verification_charge,
+          is_new_beneficiary: existing.is_new_beneficiary === 1,
         };
       }
     }
@@ -217,6 +219,8 @@ export const payoutService = {
           amount: body.amount,
           payment_mode: body.paymentMode ?? "IMPS",
           status: "UNKNOWN",
+          verification_charge: 0,
+          is_new_beneficiary: 0,
           idempotency_key: idempotencyKey ?? null,
           created_at: now,
         });
@@ -289,6 +293,8 @@ export const payoutService = {
         amount: data.amount ?? body.amount,
         payment_mode: data.payment_mode ?? body.paymentMode ?? "IMPS",
         status: data.status ?? (data.success ? "PENDING" : "FAILED"),
+        verification_charge: data.verification_charge ?? 0,
+        is_new_beneficiary: data.is_new_beneficiary ? 1 : 0,
         idempotency_key: idempotencyKey ?? null,
         created_at: now,
       });

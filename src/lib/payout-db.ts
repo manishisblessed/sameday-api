@@ -54,6 +54,8 @@ function initSchema(db: DatabaseSync): void {
       amount                 REAL    NOT NULL,
       payment_mode           TEXT    NOT NULL DEFAULT 'IMPS',
       status                 TEXT    NOT NULL DEFAULT 'UNKNOWN',
+      verification_charge    REAL    NOT NULL DEFAULT 0,
+      is_new_beneficiary     INTEGER NOT NULL DEFAULT 0,
       idempotency_key        TEXT    UNIQUE,
       created_at             TEXT    NOT NULL,
       updated_at             TEXT    NOT NULL
@@ -63,6 +65,16 @@ function initSchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_pt_created_at  ON payout_transactions(created_at);
     CREATE INDEX IF NOT EXISTS idx_pt_idempotency ON payout_transactions(idempotency_key);
   `);
+
+  // Safe migrations for existing databases — SQLite throws if the column already exists,
+  // so we catch and ignore that specific error.
+  const migrations = [
+    `ALTER TABLE payout_transactions ADD COLUMN verification_charge REAL NOT NULL DEFAULT 0`,
+    `ALTER TABLE payout_transactions ADD COLUMN is_new_beneficiary  INTEGER NOT NULL DEFAULT 0`,
+  ];
+  for (const sql of migrations) {
+    try { db.exec(sql); } catch { /* column already exists — skip */ }
+  }
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -80,6 +92,10 @@ export interface PayoutRecord {
   payment_mode: string;
   /** SUCCESS | PENDING | FAILED | UNKNOWN */
   status: string;
+  /** ₹4.72 for new beneficiaries; 0.00 for repeat. */
+  verification_charge: number;
+  /** 1 = first-ever transfer to this account; 0 = repeat. */
+  is_new_beneficiary: number;
   idempotency_key: string | null;
   created_at: string;
   updated_at: string;
@@ -102,11 +118,13 @@ export function insertTransaction(
       (transaction_id, partner_trans_id, utr,
        account_number, ifsc_code, account_holder_name, bank_name,
        mobile, amount, payment_mode, status,
+       verification_charge, is_new_beneficiary,
        idempotency_key, created_at, updated_at)
     VALUES
       (@transaction_id, @partner_trans_id, @utr,
        @account_number, @ifsc_code, @account_holder_name, @bank_name,
        @mobile, @amount, @payment_mode, @status,
+       @verification_charge, @is_new_beneficiary,
        @idempotency_key, @created_at, @updated_at)
   `).run({ updated_at: now, ...record });
 }

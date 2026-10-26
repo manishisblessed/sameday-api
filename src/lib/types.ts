@@ -800,6 +800,10 @@ export interface SdsPayoutTransferResponse {
   status?: "SUCCESS" | "PENDING" | "FAILED";
   amount?: number;
   charges?: number;
+  /** Beneficiary verification charge (₹4 + 18% GST = ₹4.72 for new accounts; 0 for repeat). */
+  verification_charge?: number;
+  /** true on the first-ever transfer to this account number. */
+  is_new_beneficiary?: boolean;
   total_debited?: number;
   payment_mode?: string;
   account_number?: string;
@@ -818,6 +822,10 @@ export interface SdsPayoutTransaction {
   status: "SUCCESS" | "PENDING" | "FAILED";
   amount?: number;
   charges?: number;
+  /** Beneficiary verification charge (₹4 + 18% GST = ₹4.72 for new accounts; 0 for repeat). */
+  verification_charge?: number;
+  /** true on the first-ever transfer to this account number. */
+  is_new_beneficiary?: boolean;
   total_debited?: number;
   payment_mode?: string;
   account_number?: string;
@@ -863,6 +871,10 @@ export interface PayoutDbRecord {
   payment_mode: string;
   /** SUCCESS | PENDING | FAILED | UNKNOWN */
   status: string;
+  /** ₹4.72 for new beneficiaries; 0 for repeat. Stored as REAL. */
+  verification_charge: number;
+  /** 1 = first-ever transfer to this account; 0 = repeat. Stored as INTEGER (SQLite bool). */
+  is_new_beneficiary: number;
   idempotency_key: string | null;
   created_at: string;
   updated_at: string;
