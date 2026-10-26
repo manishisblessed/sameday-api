@@ -55,6 +55,12 @@ next-env.d.ts
 # uploaded assets (may contain sensitive receipt images)
 /assets/
 
+# Payout SQLite DB — contains financial transaction records, never commit
+/data/
+*.db
+*.db-shm
+*.db-wal
+
 # embedded repos / subfolders
 /portal/
 

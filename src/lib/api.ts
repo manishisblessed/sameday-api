@@ -10,6 +10,7 @@ if (!BASE_URL || !API_KEY || !API_SECRET) {
   );
 }
 
+/** HMAC-SHA256 hex signature — payload must be compact JSON (no spaces). */
 function hmacSign(payload: string, secret: string): string {
   return crypto.createHmac("sha256", secret).update(payload).digest("hex");
 }
@@ -20,12 +21,30 @@ export interface ApiResult<T = unknown> {
   data: T;
 }
 
+export interface ApiFetchOptions {
+  method?: string;
+  body?: unknown;
+  query?: Record<string, string>;
+  /**
+   * Extra request headers merged after the auth headers.
+   * Use this to pass e.g. `x-idempotency-key` for the transfer endpoint.
+   */
+  extraHeaders?: Record<string, string>;
+  /**
+   * Request timeout in milliseconds.  Defaults to 30 000 ms.
+   * When the timeout fires the promise rejects with a `DOMException` whose
+   * `name === "AbortError"`.
+   */
+  timeoutMs?: number;
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
-  opts: { method?: string; body?: unknown; query?: Record<string, string> } = {}
+  opts: ApiFetchOptions = {}
 ): Promise<ApiResult<T>> {
   const method = (opts.method ?? "GET").toUpperCase();
   const url = new URL(path, BASE_URL);
+
   if (opts.query) {
     for (const [k, v] of Object.entries(opts.query)) {
       if (v) url.searchParams.set(k, v);
@@ -40,6 +59,7 @@ export async function apiFetch<T = unknown>(
 
   let bodyStr: string | undefined;
   if (method !== "GET" && method !== "HEAD" && opts.body != null) {
+    // JSON.stringify produces compact JSON (no spaces) — required for correct HMAC
     bodyStr = JSON.stringify(opts.body);
     headers["Content-Type"] = "application/json";
     headers["x-signature"] = hmacSign(bodyStr + timestamp, API_SECRET);
@@ -47,22 +67,37 @@ export async function apiFetch<T = unknown>(
     headers["x-signature"] = hmacSign("" + timestamp, API_SECRET);
   }
 
-  const res = await fetch(url.toString(), {
-    method,
-    headers,
-    body: bodyStr,
-    cache: "no-store",
-  });
-
-  const text = await res.text();
-  let data: T;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = text as unknown as T;
+  // Merge any caller-supplied extra headers (e.g. x-idempotency-key)
+  if (opts.extraHeaders) {
+    Object.assign(headers, opts.extraHeaders);
   }
 
-  return { status: res.status, ok: res.ok, data };
+  // Abort controller for timeout
+  const controller = new AbortController();
+  const timeoutMs = opts.timeoutMs ?? 30_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url.toString(), {
+      method,
+      headers,
+      body: bodyStr,
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    const text = await res.text();
+    let data: T;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text as unknown as T;
+    }
+
+    return { status: res.status, ok: res.ok, data };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function healthCheck() {

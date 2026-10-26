@@ -131,6 +131,7 @@ export interface PayoutBalanceResponse {
   success: boolean;
   balance?: number;
   is_frozen?: boolean;
+  freeze_reason?: string | null;
   error?: { code?: string; message?: string };
 }
 
@@ -761,4 +762,108 @@ export interface RechargeKitStatusResponse {
   updated_at?: string;
   request_id?: string;
   error?: { code?: string; message?: string };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Same Day Solution — Payout API v3.0 (Simplified Direct Transfer)
+// Spec: "Integrate the Same Day Solution Payout API" (2026)
+// Endpoint base: /api/partner/payout/*
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Request body for POST /api/partner/payout/transfer (v3.0 simplified). */
+export interface SdsPayoutTransferRequest {
+  accountNumber: string;
+  ifscCode: string;
+  accountHolderName: string;
+  bankName: string;
+  /** 10-digit Indian mobile number */
+  mobile: string;
+  /** Amount in ₹ — minimum ₹100, maximum ₹2,00,000 */
+  amount: number;
+  email?: string;
+  /** Defaults to "IMPS" */
+  paymentMode?: "IMPS" | "NEFT";
+  remarks?: string;
+}
+
+/** Successful transfer response (HTTP 200). */
+export interface SdsPayoutTransferResponse {
+  success: boolean;
+  message?: string;
+  /** UUID — save this for status polling.  Present on both success and failure. */
+  transaction_id?: string;
+  /** Partner-side transaction reference */
+  partner_trans_id?: string;
+  /** Bank UTR — null when status is PENDING */
+  utr?: string | null;
+  /** SUCCESS | PENDING | FAILED */
+  status?: "SUCCESS" | "PENDING" | "FAILED";
+  amount?: number;
+  charges?: number;
+  total_debited?: number;
+  payment_mode?: string;
+  account_number?: string;
+  account_holder_name?: string;
+  bank_name?: string;
+  error?: { code?: string; message?: string };
+}
+
+/** Individual transaction record (used in status and list responses). */
+export interface SdsPayoutTransaction {
+  transaction_id: string;
+  partner_trans_id?: string | null;
+  /** Bank UTR — null when PENDING or FAILED */
+  utr?: string | null;
+  /** SUCCESS | PENDING | FAILED */
+  status: "SUCCESS" | "PENDING" | "FAILED";
+  amount?: number;
+  charges?: number;
+  total_debited?: number;
+  payment_mode?: string;
+  account_number?: string;
+  account_holder_name?: string;
+  bank_name?: string;
+  ifsc_code?: string;
+  created_at?: string;
+  /** null when PENDING */
+  completed_at?: string | null;
+}
+
+/** GET /api/partner/payout/status?transactionId=… or ?partnerTransId=… */
+export interface SdsPayoutStatusResponse {
+  success: boolean;
+  transaction?: SdsPayoutTransaction;
+  error?: { code?: string; message?: string };
+}
+
+/** GET /api/partner/payout/status?list=true&limit=N */
+export interface SdsPayoutListResponse {
+  success: boolean;
+  transactions?: SdsPayoutTransaction[];
+  count?: number;
+  error?: { code?: string; message?: string };
+}
+
+/**
+ * Internal DB record stored in payout_transactions table.
+ * Mirrors SdsPayoutTransaction with the addition of idempotency_key and
+ * the UNKNOWN status used when a network timeout prevents us learning the
+ * real status.
+ */
+export interface PayoutDbRecord {
+  transaction_id: string;
+  partner_trans_id: string | null;
+  utr: string | null;
+  account_number: string;
+  ifsc_code: string;
+  account_holder_name: string;
+  bank_name: string;
+  mobile: string;
+  amount: number;
+  payment_mode: string;
+  /** SUCCESS | PENDING | FAILED | UNKNOWN */
+  status: string;
+  idempotency_key: string | null;
+  created_at: string;
+  updated_at: string;
 }

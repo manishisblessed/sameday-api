@@ -13,6 +13,10 @@ import type {
   PayoutListResponse,
   PayoutVerifyRequest,
   PayoutTransferRequest,
+  SdsPayoutTransferRequest,
+  SdsPayoutTransferResponse,
+  SdsPayoutStatusResponse,
+  SdsPayoutListResponse,
   ShadvalBalanceResponse,
   ShadvalAccountsResponse,
   ShadvalAddAccountRequest,
@@ -241,6 +245,85 @@ export async function listRecentPayouts(): Promise<PayoutListResponse> {
     return {
       success: false,
       error: { message: `Could not read payout list (HTTP ${res.status}).` },
+    };
+  }
+}
+
+// ─── Same Day Solution Payout API v3.0 (Simplified Direct Transfer) ──────────
+// These functions call the updated route handlers which use the payout-service
+// layer with DB persistence, idempotency, and proper error handling.
+
+/**
+ * Initiate an IMPS/NEFT bank transfer via the v3.0 simplified endpoint.
+ *
+ * Pass a unique `idempotencyKey` to prevent double-debits on network retries.
+ * If the response `status === "UNKNOWN"` (202), do NOT retry — call
+ * `sdsGetPayoutStatus()` with the returned `transaction_id` first.
+ */
+export async function sdsInitiateTransfer(
+  body: SdsPayoutTransferRequest,
+  idempotencyKey?: string,
+): Promise<SdsPayoutTransferResponse> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (idempotencyKey) {
+    headers["x-idempotency-key"] = idempotencyKey;
+  }
+  const res = await fetch(`${PAYOUT}/transfer`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as SdsPayoutTransferResponse;
+  } catch {
+    return {
+      success: false,
+      error: { message: `Transfer response unreadable (HTTP ${res.status}).` },
+    };
+  }
+}
+
+/**
+ * Check the status of a payout transaction.
+ * Also triggers a DB update on the server for PENDING→SUCCESS/FAILED changes.
+ */
+export async function sdsGetPayoutStatus(
+  transactionId: string,
+  partnerTransId?: string,
+): Promise<SdsPayoutStatusResponse> {
+  const params = new URLSearchParams({ transactionId });
+  if (partnerTransId) params.set("partnerTransId", partnerTransId);
+  const res = await fetch(`${PAYOUT}/status?${params.toString()}`, {
+    cache: "no-store",
+  });
+  try {
+    return (await res.json()) as SdsPayoutStatusResponse;
+  } catch {
+    return {
+      success: false,
+      error: { message: `Status response unreadable (HTTP ${res.status}).` },
+    };
+  }
+}
+
+/**
+ * List recent payout transactions from the upstream API.
+ * @param limit  Number of records to return (default 20, max 50).
+ */
+export async function sdsListPayouts(
+  limit = 20,
+): Promise<SdsPayoutListResponse> {
+  const res = await fetch(
+    `${PAYOUT}/list?limit=${Math.min(Math.max(limit, 1), 50)}`,
+    { cache: "no-store" },
+  );
+  try {
+    return (await res.json()) as SdsPayoutListResponse;
+  } catch {
+    return {
+      success: false,
+      error: { message: `List response unreadable (HTTP ${res.status}).` },
     };
   }
 }
