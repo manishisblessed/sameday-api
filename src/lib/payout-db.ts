@@ -201,6 +201,24 @@ export function findPendingTransactions(
     .all({ cutoff }) as unknown as PayoutRecord[];
 }
 
+/**
+ * Returns true if there has been at least one SUCCESS transfer to this
+ * account number. Used to decide whether the ₹4.72 new-beneficiary fee
+ * confirmation step is needed before a transfer.
+ */
+export function isKnownBeneficiary(accountNumber: string): boolean {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS cnt
+       FROM   payout_transactions
+       WHERE  account_number = ?
+       AND    status = 'SUCCESS'`,
+    )
+    .get(accountNumber) as { cnt: number } | undefined;
+  return (row?.cnt ?? 0) > 0;
+}
+
 /** Return the N most recent transactions (capped at 50). */
 export function listTransactions(limit = 20): PayoutRecord[] {
   const db = getDb();

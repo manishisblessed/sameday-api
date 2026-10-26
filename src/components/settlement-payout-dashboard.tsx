@@ -321,7 +321,31 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
     }
   }
 
-  // ── Step 2 — transfer fields ────────────────────────────────────────────────
+  // ── Step 2 — beneficiary check + transfer fields ────────────────────────────
+  // Checked automatically when user arrives at Step 2
+  const [beneficiaryChecking, setBeneficiaryChecking] = useState(false);
+  const [isNewBeneficiary, setIsNewBeneficiary] = useState<boolean | null>(null);
+  const [feeConfirmed, setFeeConfirmed] = useState(false);
+
+  const checkBeneficiary = useCallback(async (accountNumber: string) => {
+    if (!accountNumber) return;
+    setBeneficiaryChecking(true);
+    setIsNewBeneficiary(null);
+    setFeeConfirmed(false);
+    try {
+      const res = await fetch(
+        `/api/payout/check-beneficiary?accountNumber=${encodeURIComponent(accountNumber)}`,
+        { cache: "no-store" },
+      );
+      const data = await res.json() as { isNew?: boolean };
+      setIsNewBeneficiary(data.isNew ?? true);
+    } catch {
+      setIsNewBeneficiary(true); // default to showing warning on error
+    } finally {
+      setBeneficiaryChecking(false);
+    }
+  }, []);
+
   const [amount, setAmount] = useState("");
   const [mode, setMode] = useState<"IMPS" | "NEFT">("IMPS");
   const [email, setEmail] = useState("");
@@ -374,6 +398,11 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
           res.message ??
             `${res.status ?? "PROCESSING"} · ₹${res.total_debited ?? amt} debited`,
         );
+        // After a successful/pending transfer, this account is now registered
+        if (res.status === "SUCCESS" || res.status === "PENDING") {
+          setIsNewBeneficiary(false);
+          setFeeConfirmed(false);
+        }
         loadList();
         loadBalance();
       } else {
@@ -411,6 +440,13 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
 
   // ── Step navigation ─────────────────────────────────────────────────────────
   const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  // Auto-check beneficiary status whenever user moves to Step 2
+  useEffect(() => {
+    if (step === 2 && acct.trim()) {
+      checkBeneficiary(acct.trim());
+    }
+  }, [step, acct, checkBeneficiary]);
 
   // ── Auth guard ──────────────────────────────────────────────────────────────
   if (authState === "checking") {
@@ -750,16 +786,68 @@ export function SettlementPayoutDashboard({ onBack }: Props) {
                       </div>
                     )}
 
+                    {/* ── Beneficiary registration fee confirmation ──────── */}
+                    {beneficiaryChecking && (
+                      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                        <Loader2 className="h-4 w-4 animate-spin text-violet-500" />
+                        Checking beneficiary status…
+                      </div>
+                    )}
+
+                    {!beneficiaryChecking && isNewBeneficiary === true && (
+                      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                            <KeyRound className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-amber-900">New beneficiary — registration required</p>
+                            <p className="mt-0.5 text-xs text-amber-700 leading-relaxed">
+                              This account has never received a transfer. A one-time
+                              <span className="mx-1 font-bold text-amber-900">₹4.72</span>
+                              registration fee (₹4 + 18% GST) will be charged along with this transfer.
+                            </p>
+                            <div className="mt-3 rounded-lg bg-amber-100/70 px-3 py-2 text-xs text-amber-800 space-y-0.5">
+                              <p className="flex justify-between"><span>Transfer amount</span><span>₹{Number(amount) || "—"}</span></p>
+                              <p className="flex justify-between"><span>Registration fee</span><span className="font-semibold">+ ₹4.72</span></p>
+                              <p className="flex justify-between border-t border-amber-200/60 pt-1 font-bold text-amber-900">
+                                <span>Approx. total debited</span>
+                                <span>₹{((Number(amount) || 0) + 4.72).toFixed(2)}</span>
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <label className="mt-3 flex cursor-pointer items-start gap-2.5">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 accent-amber-600 cursor-pointer"
+                            checked={feeConfirmed}
+                            onChange={(e) => setFeeConfirmed(e.target.checked)}
+                          />
+                          <span className="text-xs font-medium text-amber-800 select-none">
+                            I understand that ₹4.72 will be charged as a one-time account registration fee in addition to the transfer amount.
+                          </span>
+                        </label>
+                      </div>
+                    )}
+
+                    {!beneficiaryChecking && isNewBeneficiary === false && (
+                      <div className="animate-in fade-in duration-300 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                        Registered beneficiary — no additional registration fee.
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-3 pt-2">
                       <Button
                         type="button"
                         size="lg"
                         className="gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 text-[15px] font-semibold text-white shadow-lg shadow-violet-500/25 transition-all hover:from-violet-700 hover:to-indigo-700 hover:shadow-xl disabled:opacity-60"
                         onClick={onTransfer}
-                        disabled={transferLoading}
+                        disabled={transferLoading || (isNewBeneficiary === true && !feeConfirmed)}
                       >
                         {transferLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                        Initiate transfer
+                        {isNewBeneficiary === true && !feeConfirmed ? "Confirm fee to proceed" : "Initiate transfer"}
                       </Button>
                       <Button
                         type="button"
